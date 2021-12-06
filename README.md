@@ -1,18 +1,17 @@
 # dmv_test
 Data analysis of DMV Tests for potential fraud.
 
-Around 11/2/21 DMV suspected there was cheating on the driving test web site. The tests were completed more rapidly than thought reasonable. Work started to see if Splunk could detect the fraud. It was hoped that methods could be developed that would be useful for other applications.
+Around 11/2/2021 DMV suspected there was cheating on the driving test web site. The tests were completed more rapidly than thought reasonable. Work started to see if Splunk could detect the fraud. It was hoped that methods could be developed that would be useful for other applications.
 
 The contractor, applus, extracted data from the database and supplied a spreadsheet of 4561 web tests from 10/28/2021 04:30 - 11/5/2021 12:58
 
 ## dmv_tests.ipynb
 1. Input and clean the raw data with pre_dmv_sample()
-    - Eliminate 110 events with result=NaN
-    - Eliminate 36 events with more than one ip address
-    - Add column ip by split'ing it from IPAdress column
-    - Add column result_std by putting None whenevr Result is NaN
+    - Eliminate 110 events with result=NaN. These tests also have IPAddress.isna(), TotalScore.isna()
+    - Add column ip by split'ing it from IPAddress column
+    - Treat 36 events with more than one ip address by using only the first one
     - Add column duration (in minutes) from column TotalTimeSpent/60
-    - Write clean_sample_data.csv after raw data is cleaned (optional)
+    - Optionally, write clean_sample_data.csv after raw data is cleaned
 1. plt_duration()
     - histogram of test duration by test result
     - cumulative of same
@@ -44,9 +43,9 @@ The contractor, applus, extracted data from the database and supplied a spreadsh
     - The distribution of TotalQuestionsCorrect is definitely different. The number is skewed to higher results, especially for the perfect score of 50.
 1. ips_that_are_duplicated()
     - 645 tests used the same ip address as another test
-1. displot("of the tests that used duplcate ip address", TotalQuestionsCorrect, duration)
--  
-
+1. displot_xy("of the tests that used duplicate ip addresses", TotalQuestionsCorrect, duration)
+    - Show high success rate for duration <= 15 
+![This is a alt text.](duration_vs_totalcorrect_duplicateipusers.png)
 
 ## mywhois.ipynb
 1. class Risk() create and use a memoized arin database
