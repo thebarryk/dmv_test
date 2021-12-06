@@ -45,7 +45,7 @@ The contractor, applus, extracted data from the database and supplied a spreadsh
     - 645 tests used the same ip address as another test
 1. displot_xy("of the tests that used duplicate ip addresses", TotalQuestionsCorrect, duration)
     - Show high success rate for duration <= 15 
-![This is a alt text.](duration_vs_totalcorrect_duplicateipusers.png)
+![Heat map](duration_vs_totalcorrect_duplicateipusers.png)
 
 ## mywhois.ipynb
 1. class Risk() create and use a memoized arin database
