@@ -107,7 +107,7 @@ def parse_arin(html_text, ip_string):
                 r = fillna(t)
         return r
     def get_timestamp():
-        return datetime.now()
+        return datetime.now().strftime("%m:%d:%Y %H:%M:%S")
     def get_cidr(netw, info):
         tag = netw.netblocks
         if tag is None:
@@ -148,19 +148,15 @@ def parse_arin(html_text, ip_string):
         info["city"] = get_city(cust)
         info["handle"] = get_handle(cust)
         info["timestamp"] = get_timestamp()
-
-#         import pdb; pdb.set_trace()
-
         # Add the risk obtained from scamalytics
         info.update(get_risk(ip_string))
-    
         # Parse into dict to return results, item by item
         result = get_cidr(netw, info)
 
         return result
     
     except:
-        debug.prt(f"Error in parse_arin({ip_string=}")
+        debug.prt(f"Error in parse_arin({ip_string=}\n")
         return None
 
 
@@ -209,7 +205,7 @@ class Risk():
             self.db = dbm.open(self.db_filename, self.open_option)
         except:
             if self.readonly:
-                print(f"{self.db_filename} does not exist but will not be created when class is {readonly=}")
+                debug.prt(f"{self.db_filename} does not exist but will not be created when class is {readonly=}\n")
                 return None
             else:
                 self.db = dbm.open(self.db_filename, "c")
@@ -246,7 +242,7 @@ class Risk():
             self.ip = ipaddress.ip_address(ip_string)
         except:
             self.ip = None
-            debug.prt(f"Risk.find: Could not find IPv4Address for {ip_string=}")
+            debug.prt(f"Risk.find: Could not find IPv4Address for {ip_string=}\n")
             return None
         
         # Find the address to insert
@@ -307,8 +303,8 @@ class Risk():
             try:
                 pickled_netblock = pickle.dumps(netblock, protocol=self.hp)
                 # This is a hack that allows pickle to work 
-                new_risk_temp = f"{new_risk}"
-                pickled_risk = pickle.dumps(new_risk_temp, protocol=self.hp)
+#                 new_risk_temp = f"{new_risk}"
+                pickled_risk = pickle.dumps(new_risk, protocol=self.hp)
                 additions.append([pickled_netblock, pickled_risk])
             except BaseException as ex:
                 debug.prt(f"Pickle error {ex}: {new_cidr=}\n{new_risk=}\n")
