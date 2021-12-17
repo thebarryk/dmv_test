@@ -9,9 +9,9 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import os
-import traceback
 from datetime import datetime
 import pprint
+from unidecode import unidecode
 
 
 class Debug():
@@ -25,9 +25,7 @@ class Debug():
         self._set = 1
     def unset(self):
         self._set = 0
-
-debug = Debug()
-        
+debug = Debug()       
 
 def get_risk(ip_string):
     # Return risk factors from scamalytics into a dict
@@ -47,15 +45,18 @@ def get_risk(ip_string):
     
     # Tag=pre
     result = json.loads(soup.pre.string)
-    
+
     # The comment is in the body of an unlabelled div. Used the css class to find.
-    # Remove special UTF-8 character \U200b, a zero width space.
-    result["risk_comment"] = soup.find_all("div", class_="panel_body")[0].get_text().replace("\u200b","")
-#     result["risk_comment"] = ""
+    # Cleanup special characters
+#     temp = soup.find_all("div", class_="panel_body")[0]
+#     result["risk_comment"] = unidecode( temp.get_text() )
     
     return result
 
 def parse_arin(html_text, ip_string):
+    # Return dict of info from arin and scamalytics for each 
+    # cidr address associated with this ip.
+    # Return None when no information can be found
     # Values that are not found are set to np.NaN
     
     fillna = lambda x: np.nan if x is None else x if isinstance(x, str) else x.string
@@ -70,7 +71,10 @@ def parse_arin(html_text, ip_string):
             address.append(line.string)
         return address
     def get_postalcode(cust):
-        return fillna(cust.postalcode)
+        import pdb; pdb.set_trace()
+        v = cust.postalcode.string
+        return v
+#         return fillna(cust.postalcode)
     def get_city(cust):
         return fillna(cust.city)
     def get_handle(cust):
@@ -108,23 +112,20 @@ def parse_arin(html_text, ip_string):
         return r
     def get_timestamp():
         return datetime.now().strftime("%m:%d:%Y %H:%M:%S")
-    def get_cidr(netw, info):
+    def get_cidr(netw):
+        # Return a list of cidr's associated with this ip_string
+        cidrs = []
         tag = netw.netblocks
         if tag is None:
             return None
-        r = {}
         for netblock in tag:
+            # Parse the cidr for each netblock
             cidr_prefix = fillna(netblock.startaddress)
             cidr_length = fillna(netblock.cidrlength)
             if (cidr_prefix is None) or (cidr_length is None):
                 continue
-            cidr = cidr_prefix + "/" + cidr_length
-            info["cidr"] = cidr 
-            r[cidr] = info
-        return r if len(r)>0 else None
-
-    # Parse html into a hierarchy using BeautifulSoup 
-    soup = BeautifulSoup(html_text, 'lxml')
+            cidrs.append(cidr_prefix + "/" + cidr_length)
+        return cidrs if len(cidrs)>0 else None
 
     # ARIN reports a list of CIDR net_addresses. 
     # The database will be indexed by ipaddress.net_address.
@@ -132,63 +133,70 @@ def parse_arin(html_text, ip_string):
     # Obtain the organization name from tag=net instead of the tag=org which
     # has more than one tag=name making it harder to isolate.
     try:
-        info = {}
-
-        # Check to see if tag=customer is available, otherwise use tag.org
-        
+        # Parse html into a hierarchy using BeautifulSoup 
+        soup = BeautifulSoup(html_text, 'lxml')
+        # Check to see if tag=customer is available, otherwise use tag.org       
         cust = soup.customer if soup.org is None else soup.org
+
+        # Parse into dict info to return results, item by item
+        info  = {}
+        risks = {}
+
+
         netw = soup.net
+        cidrs = get_cidr(netw)
+        if cidrs is None:
+            return None
 
-        info["address"] = get_streetaddress(cust)
+        # Get the dict risks
+        risk = get_risk(ip_string)
+
+        # Append risks to the arin info. It's the same for each cidr.
+        info.update(risk)
+
+#         info["address"] = get_streetaddress(cust)
         info["postalcode"] = get_postalcode(cust)
-        info["state"] = get_state(cust)
-        info["country"] = get_country(cust)
-        info["countrycode"] = get_countrycode(cust)
-        info["organization"] = get_organization(cust, info)
-        info["city"] = get_city(cust)
-        info["handle"] = get_handle(cust)
+#         info["state"] = get_state(cust)
+#         info["country"] = get_country(cust)
+#         info["countrycode"] = get_countrycode(cust)
+#         info["organization"] = get_organization(cust, info)
+#         info["city"] = get_city(cust)
+#         info["handle"] = get_handle(cust)
         info["timestamp"] = get_timestamp()
-        # Add the risk obtained from scamalytics
-        info.update(get_risk(ip_string))
-        # Parse into dict to return results, item by item
-        result = get_cidr(netw, info)
 
-        return result
+        # Return all the cidrs for this ip
+        for cidr in cidrs:
+            risks[cidr] = info
+        return risks
     
     except:
         debug.prt(f"Error in parse_arin({ip_string=}\n")
         return None
 
-
 def get_arin(ip_string):
     '''Return dict for the net_address that contains this ip_string
-        {"cidr": ?,
-         {"organization": ? ,
-          "handle": ? ,
-          "city": ? ,
-          "address" : ? ,
-          "postalcode": ? ,
-          "countrycode": ? ,
-          "state": ? ,
-          "country": ? ,
-          "timestamp": ?,
-          cidr,
-         }
+        {"cidr": ?, 
+            {"organization": ? , "handle": ? ,     "city": ? ,
+             "address" : ? ,     "postalcode": ? , "countrycode": ? ,
+             "state": ? ,        "country": ? ,    "timestamp": ?, cidr,}
+        }
     '''
-
     # Fetch the complete record from arin restful api
     # Ref: https://www.arin.net/resources/registry/whois/rws/api/#networks-and-asns
     # ip_string ... make request by ip address as a string
     # pft ......... get full record
     
-    url = "http://whois.arin.net/rest/ip/" + ip_string + "/pft"
-    html_text = ""
     try:
+        url = "http://whois.arin.net/rest/ip/" + ip_string + "/pft"
+        html_text = ""
         html_text = requests.get(url).text
     except:
         return None
-    return parse_arin(html_text, ip_string)
 
+#     import pdb; pdb.set_trace()
+
+    result = parse_arin(html_text, ip_string)
+    return result
 
 class Risk():
     
@@ -222,8 +230,7 @@ class Risk():
 
         self.risk_count = len(self.risk)
         self.db.close()
-
-        
+    
     def find(self, ip_string):
         """ 
         risk[cidr] = {organization, handle, city, address, postalcode, countrycode, state, ...}
@@ -235,9 +242,12 @@ class Risk():
         - ARIN dict ... Risk.ip and Risk.searchresult (==Risk.ip)
                         or Risk.ip and Risk.findarin and Risk.addarin (==Risk.findarin)
         """
+        self.searchresult = None
+        self.getarin = None
+        self.addarin = None
 
 #         import pdb; pdb.set_trace()
-        
+        # ip_address object is used in database
         try: 
             self.ip = ipaddress.ip_address(ip_string)
         except:
@@ -245,36 +255,31 @@ class Risk():
             debug.prt(f"Risk.find: Could not find IPv4Address for {ip_string=}\n")
             return None
         
-        # Find the address to insert
-        self.searchresult = None
-        self.findarin = None
-        self.addarin = None
-        
-        # Try to find in the existing database
-        
+        # Find the cidr in the database
         self.searchresult = self.cidr_search(self.ip)
 
-        # Not found:
+        # Not found when None:
         if self.searchresult:
             return self.searchresult
         
-        # Return None when readonly
-        elif self.readonly:
+        # Return None when readonly so database is not changed
+        if self.readonly:
             return None
             
-        # Fetch arin and risk info and try to add into the database. Return None if it cannnot
-        else:
-            self.findarin = get_arin(ip_string)
-            if self.findarin is None:
-                debug.prt(f"Risk.Find: No arin results for {ip_string=}\n")
-                return None
-            self.addarin = self.add(self.findarin)
-            if self.addarin is None:
-                debug.prt(f"Risk.find: ARIN results could not be added for {ip_string=}\n")
-                return None
-            return self.addarin
+        # Fetch arin info. Otherwise return None
+        self.getarin = get_arin(ip_string)
+        if self.getarin is None:
+            debug.prt(f"Risk.Find: No arin results for {ip_string=}\n")
+            return None
+        
+        # Add new value to the dict self.risk. Otherwise retunr None.
+        self.addarin = self.add(self.getarin)
+        if self.addarin is None:
+            debug.prt(f"Risk.find: ARIN results could not be added for {ip_string=}\n")
+            return None
+        # 
+        return self.addarin
     
-
     def add(self, new_risks):
         '''
         Add the result of get_arin, a dict with cidr as key 
@@ -317,7 +322,6 @@ class Risk():
 
         return True
     
-
     def cidr_search(self, target_ip):
         # risk.cidr_search(target_ip) is is the net_address that contains the target_ip
         # = None when ip's network is not in db
