@@ -3,7 +3,9 @@ import pandas as pd
 import numpy as np
 import ipaddress
 import dbm
-import pickle
+# import pickle
+import dill as pickle
+# from dill import dumps, loads
 from sortedcontainers import SortedDict
 import requests
 from bs4 import BeautifulSoup
