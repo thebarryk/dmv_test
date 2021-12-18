@@ -3,9 +3,8 @@ import pandas as pd
 import numpy as np
 import ipaddress
 import dbm
-# import pickle
-import dill as pickle
-# from dill import dumps, loads
+import pickle
+# import dill as pickle
 from sortedcontainers import SortedDict
 import requests
 from bs4 import BeautifulSoup
@@ -50,8 +49,8 @@ def get_risk(ip_string):
 
     # The comment is in the body of an unlabelled div. Used the css class to find.
     # Cleanup special characters
-#     temp = soup.find_all("div", class_="panel_body")[0]
-#     result["risk_comment"] = unidecode( temp.get_text() )
+    temp = soup.find_all("div", class_="panel_body")[0]
+    result["risk_comment"] = unidecode( temp.get_text() ).replace("  "," ").replace("  "," ")
     
     return result
 
@@ -61,7 +60,7 @@ def parse_arin(html_text, ip_string):
     # Return None when no information can be found
     # Values that are not found are set to np.NaN
     
-    fillna = lambda x: np.nan if x is None else x if isinstance(x, str) else x.string
+    fillna = lambda x: np.nan if x is None else f"{x}" if isinstance(x, str) else f"{x.string}"
     
     def get_streetaddress(cust):
         # More than one address line may be recorded
@@ -70,13 +69,10 @@ def parse_arin(html_text, ip_string):
             return np.nan
         address = []
         for line in tag:
-            address.append(line.string)
+            address.append(f"{line.string}")
         return address
     def get_postalcode(cust):
-        import pdb; pdb.set_trace()
-        v = cust.postalcode.string
-        return v
-#         return fillna(cust.postalcode)
+        return fillna(cust.postalcode)
     def get_city(cust):
         return fillna(cust.city)
     def get_handle(cust):
@@ -156,14 +152,14 @@ def parse_arin(html_text, ip_string):
         # Append risks to the arin info. It's the same for each cidr.
         info.update(risk)
 
-#         info["address"] = get_streetaddress(cust)
+        info["address"] = get_streetaddress(cust)
         info["postalcode"] = get_postalcode(cust)
-#         info["state"] = get_state(cust)
-#         info["country"] = get_country(cust)
-#         info["countrycode"] = get_countrycode(cust)
-#         info["organization"] = get_organization(cust, info)
-#         info["city"] = get_city(cust)
-#         info["handle"] = get_handle(cust)
+        info["state"] = get_state(cust)
+        info["country"] = get_country(cust)
+        info["countrycode"] = get_countrycode(cust)
+        info["organization"] = get_organization(cust, info)
+        info["city"] = get_city(cust)
+        info["handle"] = get_handle(cust)
         info["timestamp"] = get_timestamp()
 
         # Return all the cidrs for this ip
