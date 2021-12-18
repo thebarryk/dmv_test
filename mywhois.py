@@ -83,7 +83,8 @@ def parse_arin(html_text, ip_string):
         # BeautifulSoup does not parse tags contain "-" so
         # use find_all to locate the tags with a string search.
         tag = cust.find_all("iso3166-2")
-        if tag is None:
+        # When the iso3166-2 is not present, tag = []
+        if tag is None or len(tag) == 0:
             return np.nan
         for t in tag:
             result = fillna(t)
