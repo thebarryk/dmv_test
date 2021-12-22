@@ -232,8 +232,8 @@ class Risk():
     
     def find(self, ip_string):
         """ 
-        risk[cidr] = {organization, handle, city, address, postalcode, countrycode, state, ...}
-        not readony  ... create one if needed and add it to the database.
+        risk[cidr] = {organization, handle, city, ...}
+        not readonly... create one if needed and add it to the database.
         Return:
         - None ........ when Risk.ip is None
                         when Risk.ip and not Risk.findarin then Risk.findarin was found 
@@ -245,7 +245,6 @@ class Risk():
         self.getarin = None
         self.addarin = None
 
-#         import pdb; pdb.set_trace()
         # ip_address object is used in database
         try: 
             self.ip = ipaddress.ip_address(ip_string)
@@ -279,6 +278,26 @@ class Risk():
         # 
         return self.addarin
     
+    def find_children(self, candidate):
+        # Find the children of a ip_address, candidate.
+        # A child is a subset of a parent.
+        children = []
+        for potential_child in self.risk:
+            if potential_child[0] in candidate:
+                children.append(potential_child)
+        return children
+
+    def remove_children(self, candidate):
+        # Delete a list of cidr's from the database
+    
+        cidrs = self.find_children(candidate)
+
+        with dbm.open(self.db_filename, self.open_option) as self.db:
+            for cidr in cidrs:
+                self.risk.pop(cidr)
+                self.db.pop(pickle.dumps(cidr, protocol=self.hp))
+        return True
+
     def add(self, new_risks):
         '''
         Add the result of get_arin, a dict with cidr as key 
@@ -288,14 +307,17 @@ class Risk():
                  A risk value could not be pickle'd
         True ... Risks added successfully
         '''
-#         import pdb; pdb.set_trace()
                
         # Store in dictionary first.
         # There may be more than one cidr retrieved by get_arin
         # Each CIDR has to be type ip_network
 
-        for new_cidr, new_risk in new_risks.items():
+        for new_cidr, new_risk in new_risks.items():          
             netblock = ipaddress.ip_network(new_cidr)
+            
+            # Remove any existing cidr's that are subsets of new_cidr
+            self.remove_children(netblock)
+
             self.risk[netblock] = new_risk
         
             # Store in database next
@@ -306,10 +328,9 @@ class Risk():
             # key and value have to be pickle'd before storing
             try:
                 pickled_netblock = pickle.dumps(netblock, protocol=self.hp)
-                # This is a hack that allows pickle to work 
-#                 new_risk_temp = f"{new_risk}"
                 pickled_risk = pickle.dumps(new_risk, protocol=self.hp)
                 additions.append([pickled_netblock, pickled_risk])
+
             except BaseException as ex:
                 debug.prt(f"Pickle error {ex}: {new_cidr=}\n{new_risk=}\n")
                 return False
@@ -318,7 +339,7 @@ class Risk():
             with dbm.open(self.db_filename, self.open_option) as self.db:
                 for addition in additions:
                     self.db[addition[0]] = addition[1]
-
+            
         return True
     
     def cidr_search(self, target_ip):
@@ -341,3 +362,8 @@ class Risk():
                 s = m + 1
         self.cidr_search_result = None
         return self.cidr_search_result
+    
+    
+        
+        
+                
