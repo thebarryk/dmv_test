@@ -1,3 +1,11 @@
+'''  Module of functions to grow a db of risks for ip addresses
+    - Debug: print debug messages (doesn't belong here)
+    - get_risk(ip_string): Fetch risk score from scamalytics api
+    - get_arin(ip_string): Fetch arin netblocks and owner
+    - parse_arin: utility to parse the result of arin api call
+    - class Risk: Find risk from ip_string. Make db to memoize.
+      * Makes api's call to find one it and add to db
+'''
 import sys
 import pandas as pd
 import numpy as np
@@ -283,6 +291,9 @@ class Risk():
         # A child is a subset of a parent.
         children = []
         for potential_child in self.risk:
+            # Skip a duplicate
+            if potential_child == candidate:
+                continue
             if potential_child[0] in candidate:
                 children.append(potential_child)
         return children
