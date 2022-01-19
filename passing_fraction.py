@@ -3,6 +3,12 @@
 # The bins are calculated by dividing the longest duration by some integer.
 # See dmv_test/passing_fraction.py
 
+import dmv_test_input
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+import mplcursors
+
 def passing_fraction(df, limits):
     # passing_fraction: DataFrame with columns duration and fraction of passed tests 
     # input:
@@ -30,6 +36,8 @@ def passing_fraction(df, limits):
 def duration_intervals(lo=5., hi=100., inc=5.):
     r = np.arange(lo, hi+0.01*(hi-lo)/inc, inc)
     return [ (r[i], r[i+1]) for i in range(len(r)-1) ] 
+
+df, risk = dmv_test_input.dmv_risk_input()
 
 limits = duration_intervals(lo=2.8, hi=40., inc=0.5)
 pf = passing_fraction(df, limits)
