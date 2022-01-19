@@ -1,51 +1,76 @@
-# Show variation of success vs time spent taking the driver's test.
-# The success rate is averaged over bins of time taken to do the test.
-# The bins are calculated by dividing the longest duration by some integer.
-# See dmv_test/passing_fraction.py
-
-import dmv_test_input
-import matplotlib.pyplot as plt
+# Gather modules
 import pandas as pd
-import seaborn as sns
-import mplcursors
+import mywhois
 
-def passing_fraction(df, limits):
-    # passing_fraction: DataFrame with columns duration and fraction of passed tests 
-    # input:
-    #    df ...... dmv dataframe with columns duration and Result
-    #    limits .. list of (upper, lower) bounds of duration intervals as produced 
-    #              by function duration_intervals
-    # DataFrame:
-    #    duration ... average of the upper and lower bounds of each interval
-    #    fraction ... # of tests passed over total tests taken during the duration period
-    pf = []
-    for lim in limits:
-        np = df[(df.duration>=lim[0]) & (df.duration<lim[1]) & (df.Result=="P")]["duration"].count()
-        nf = df[(df.duration>=lim[0]) & (df.duration<lim[1]) & (df.Result!="P")]["duration"].count()
-        duration = 0.5*(lim[0] + lim[1])
-        try:
-            fraction = float(np)/( float(np) + float(nf) )
-        except:
-            fraction = 0
-        pf.append( (duration, fraction) )
-    return pd.DataFrame({
-        "duration": [x[0] for x in pf],
-        "fraction": [x[1] for x in pf]
-    })
+def prep_dmv_sample(raw_dataframe, save=False, filename="clean_test_data.csv"):
+    # Data prep from sample downloaded from web site database
 
-def duration_intervals(lo=5., hi=100., inc=5.):
-    r = np.arange(lo, hi+0.01*(hi-lo)/inc, inc)
-    return [ (r[i], r[i+1]) for i in range(len(r)-1) ] 
+    original_length = len(raw_dataframe)
+    print(f"Original length of sample data is {original_length}")
 
-df, risk = dmv_test_input.dmv_risk_input()
+    # Drop data with Result.isna(). These events also have TotalScore=0, IPAddress.isna().
+    # - Show them using: df[df["Result"].isna()]
+    # - rest_index() is needed after the rows are dropped
 
-limits = duration_intervals(lo=2.8, hi=40., inc=0.5)
-pf = passing_fraction(df, limits)
+    df = raw_dataframe.dropna(axis=0, subset=["Result"]).reset_index(drop=True)
 
-fig, ax = plt.subplots(figsize=(10, 5))
-plt.plot(pf.duration, pf.fraction, "o")
-mplcursors.cursor(hover=True)
-ax.set_title("Passing Fraction vs Duration (min)")
-ax.set_xlabel("Duration (min)")
-ax.set_ylabel("Passing Fraction")
-plt.show()
+    dropped_nan = original_length - len(df)
+    print(f"{dropped_nan} tests with Result, IPAddress, TotalScore = NaN dropped")
+
+    # Add column, ip, with the port number from the reported ip address
+    df["ip"] = df.IPAddress.apply(lambda x: x.split(":")[0])
+
+    # Add column, duration, for the TotalTimeSpent in minutes
+    df["duration"] = df.TotalTimeSpent/60    
+
+    # Add column, duration, for the TotalTimeSpent in minutes
+    df["duration"] = df.TotalTimeSpent/60
+
+    # Some events have more than 1 ip address
+    df["multiple_ip"] = df.ip.apply( lambda x: len(x.split(","))>1)
+
+    # Remove the extra ip address from tests with more than 1 ip address
+    df.loc[:,"ip"] = df.ip.apply(lambda x: x.split(",")[0])
+    print(f'Extra ip address dropped in {len(df[df["multiple_ip"]])} tests')
+    
+    # Make a copy of the cleaned data
+    if save:
+        df.to_csv("clean_test_data.csv", index=False)
+    return df
+
+    
+def dmv_risk_input():
+    # Reads dmv_test test data, preps and adds ip risk.
+    # Returns tuple:
+    #   df .... dataframe combo of dmv_test data and ip risk
+    #   risk .. dict of the risk associated using an ip address
+    def fetch_score(ip):
+        # Fetch the risk score associated with this ip address
+        # Return as float so it can be used numerically
+        r = risk.find(ip)
+        if r:
+            return float(r["score"])
+        return -1
+
+    def fetch_risk(ip):
+        # Fetch the risk discriptor
+        r = risk.find(ip)
+        if r:
+            return r["risk"]
+        return "Unknown"
+    
+    # Input data
+    sample_filename = "/home/bkrawchuk/notebooks/dmv_test/OPT11022021-11042021.csv"
+
+    # Read the sample data downloaded from the DMV testing web site
+    df1 = pd.read_csv(sample_filename)
+    df = prep_dmv_sample(df1, save=True)
+    
+    # Add the risk associated while using the client's ip address
+    risk = mywhois.Risk("mywhois", readonly=True)
+
+    vscore = df.loc[:,"ip"].apply(fetch_score).copy()
+    vrisk  = df.loc[:,"ip"].apply(fetch_risk).copy()
+    df.loc[:,"risk"]  = vrisk
+    df.loc[:,"score"] = vscore
+    return df, risk
