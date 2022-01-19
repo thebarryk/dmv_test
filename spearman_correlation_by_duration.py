@@ -4,10 +4,12 @@
 # In[1]:
 
 
+get_ipython().run_line_magic('matplotlib', 'notebook')
 import mplcursors
 import dmv_test_input
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
+import numpy as np
 
 # Spearman_by_limit: Spearman correlations for range of test durations.
 # Graphs show that % passing scores is higher when test duration is shorter.
