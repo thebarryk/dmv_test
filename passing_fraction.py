@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[6]:
 
 
 # Show variation of success vs time spent taking the driver's test.
@@ -51,6 +51,7 @@ def plot_spearman(df):
     ax.set_title("Passing Fraction vs Duration (min)")
     ax.set_xlabel("Duration (min)")
     ax.set_ylabel("Passing Fraction")
+    plt.grid(visible=True)
     plt.show() 
 
 def main():
