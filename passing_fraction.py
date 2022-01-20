@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[6]:
+# In[7]:
 
 
 # Show variation of success vs time spent taking the driver's test.
@@ -62,7 +62,8 @@ def main():
 
     plot_spearman(pf)
 
-main()
+if __name__ == '__main__':
+    main()
 
 
 # In[ ]:
