@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[83]:
 
 
 get_ipython().run_line_magic('matplotlib', 'notebook')
@@ -18,24 +18,33 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import dmv_test_input
 
-def calc_correlation(pf):
-    cf = pd.DataFrame(np.arange(10, 30, 2), columns=["midpt"])
+def calc_correlation(pf, lo=10, hi=30, inc=2):
+    def split_tuple(df, src, new):
+        # Split the tuple into 2 new columns.
+        # See https://www.codegrepper.com/code-examples/python/pandas+split+column+with+tuple
+        df[new] = pd.DataFrame(df[src].tolist(), index=df.index)
+        
+    cf = pd.DataFrame(np.arange(lo, hi, inc), columns=["midpt"])
 
-    dless = lambda x: pf[pf.duration <  x]
-    dmore = lambda x: pf[pf.duration >= x]
+    less = lambda x: pf[pf.duration <  x]
+    more = lambda x: pf[pf.duration >= x]
 
-    cbefore = lambda x: pearsonr(dless(x).duration, dless(x).fraction)[0]
-    cafter  = lambda x: pearsonr(dmore(x).duration, dmore(x).fraction)[0]
+    before = lambda x: pearsonr(less(x).duration, less(x).fraction)
+    after  = lambda x: pearsonr(more(x).duration, more(x).fraction)
 
-    cf["before_midpt"] = cf.midpt.apply(cbefore)
-    cf["after_midpt"]  = cf.midpt.apply(cafter)
+    cf["before"] = cf.midpt.apply(before)
+    cf["after"]  = cf.midpt.apply(after)
+    
+    # pearsonr supplies a tuple (pearson coefficient, p-value) so it needs to be split.
+    split_tuple(cf, src="before", new=["before_pearson", "before_pvalue"])
+    split_tuple(cf, src="after",  new=["after_pearson",   "after_pvalue"])
     return cf
 
 def plot_correlation_midpoints(df):
     fig, ax = plt.subplots()
 
-    plt.plot(df.midpt, df.before_midpt, "-o")
-    plt.plot(df.midpt, df.after_midpt, "-v")
+    plt.plot(df.midpt, df.before_pearson, "-o")
+    plt.plot(df.midpt, df.after_pearson,  "-v")
     
     mplcursors.cursor(hover=True)
     fig.set_size_inches(10, 6)
@@ -59,18 +68,20 @@ def plot_correlation_midpoints(df):
                )
     plt.grid(visible=True)
     plt.show()
+
     
 def main():
     df, risk = dmv_test_input.dmv_risk_input()
 
-    limits = pfs.duration_intervals(lo=2.8, hi=40., inc=0.5)
+    limits = pfs.duration_intervals(lo=2.8, hi=40, inc=.5)
     pf = pfs.passing_fraction(df, limits)  
 
-    cf = calc_correlation(pf)
+    cf = calc_correlation(pf, lo=10, hi=30, inc=2)
     cf.head()
     plot_correlation_midpoints(cf)
+    return df, risk, cf
 if __name__ == '__main__':
-    main()
+    df, risk, cf = main()
 
 
 # In[ ]:
