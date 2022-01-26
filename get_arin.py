@@ -1,3 +1,8 @@
+''' Fetch the complete record from arin restful api
+    Ref: https://www.arin.net/resources/registry/whois/rws/api/#networks-and-asns
+    ip ... make request by ip address as a string
+    pft .. get full record
+'''
 def get_arin(ip_string):
     '''Return dict for the net_address that contains this ip_string
         {"cidr": ?,
@@ -14,11 +19,6 @@ def get_arin(ip_string):
     '''
     
     fillna = lambda x: "" if not x else x.string if not isinstance(x, str) else x
-    
-    # Fetch the complete record from arin restful api
-    # Ref: https://www.arin.net/resources/registry/whois/rws/api/#networks-and-asns
-    # ip ... make request by ip address as a string
-    # pft .. get full record
     
     url       = "http://whois.arin.net/rest/ip/" + ip_string + "/pft"
     html_text = ""
