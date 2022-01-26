@@ -1,24 +1,25 @@
 # List overlapping cidr in the whois database.
 # Risk.add must make sure to look before adding and report errors.
 # There are 4 cases:
-# ---------------------------------------- Case 1: Spans on low side
-#  |      |-------old------|                       An error. Check ARIN.
-#  |           |                                   Do not add cidr.
+# ------------------------------- Case 1: Spans on low side
+#  |      |-------old------|              An error. Check ARIN.
+#  |           |                          Do not add cidr.
 #  |----new----|
 #
-# ---------------------------------------- Case 2: Overlaps old completely
-#  |      |-------old------|  |                    Add new cidr; delete old one.
-#  |                          |                    Caution: May be more than 1 old.
+# ------------------------------- Case 2: Overlaps old completely
+#  |      |-------old------|  |           Add new cidr; delete old one.
+#  |                          |           Note: May be more than 1 old.
 #  |----new-------------------|
 #
-# ---------------------------------------- Case 3: Overlapped by old completely
-#         |-------old------|                       Do not add cidr.
-#              |        |                          Error because cidr_search would
-#              |--new---|                          find old cidr first.
+# ------------------------------- Case 3: Overlapped by old completely
+#         |-------old------|              Do not add cidr.
+#              |        |                 Error because cidr_search
+#              |--new---|                 would find old cidr first.
+#                                         Do not include old==new
 #
-# ---------------------------------------- Case 4: Spans on high side
-#         |-------old------|  |                    An error. Check ARIN.
-#              |              |                    Do not add cidr.
+# ------------------------------- Case 4: Spans on high side
+#         |-------old------|  |           An error. Check ARIN.
+#              |              |           Do not add cidr.
 #              |----new-------|
 #
 
@@ -37,7 +38,7 @@ class Sample_overlap():
 
 def main():
     # Read the current mywhois database
-    whois = mywhois.Risk("mywhois", readonly=False)
+    whois = mywhois.Risk("mywhois", readonly=True)
     risk = whois.risk
 
     # Countrol the looping during development
@@ -53,14 +54,11 @@ def main():
         if show:
             print(str, end=end)
         
-#     import pdb; pdb.set_trace()
-
     # Sample the two overlaps to see if the arin and risk info is different
 
     sample_overlaps = Sample_overlap()
     sample = sample_overlaps.sample
 
-            
     # Treat every cidr as a potential candidate.
     # There's no need to test the last one.
     for i in range(len_keys-1):
@@ -90,11 +88,8 @@ def main():
                 else:
                     # Case 2: this new completely contains old
                     case = 2
-                    # (printing this way means they can be sorted)
-                    # print(f"({new[0]}, {new[-1]}) Old: ({old[0]}, {old[-1]}) {case=}")
                     prt(f"{risk_keys[j]=}: ({old[0]}, {old[-1]})", end=" ")
                     prt(f"{risk_keys[i]=}: ({new[0]}, {new[-1]}) {case=}")
-                    # print(f"{risk_keys[j]=}: ( {old[0]}, {old[-1]}) {risk_keys[i]=}: ({new[0]}, {new[-1]} {case=})")
                     sample(risk_keys[i], risk_keys[j])
                     continue
 
@@ -119,14 +114,16 @@ def main():
             prt(f"New: ({new[0]}, {new[-1]}) Old: ({old[0]}, {old[-1]} {case=})")
 
     # Look for diferences in arin and risk for sample
+
     def chk(cidrs, r, f):
         g1 = f"{cidrs[0]} and {cidrs[1]}"
-        g2 = lambda f: f"{f}s {r[0][f]} <-->  {r[1][f]}"
+        g2 = lambda f: f"{f}s {r[0][f]} <--> {r[1][f]}"
         if r[0][f] != r[1][f]:
             print(g1, "have different", g2(f))
+
     def chk2(cidrs, r, f="risk"):
         g1 = f"{cidrs[0]} and {cidrs[1]}"
-        g2 = lambda f: f"{f}s {r[0][f]} <-->  {r[1][f]}"
+        g2 = lambda f: f"{f}s {r[0][f]} <--> {r[1][f]}"
         if r[0][f] != r[1][f]:
             print(g1, "have different", g2("risk"))
             print("    ", g2("score"))
