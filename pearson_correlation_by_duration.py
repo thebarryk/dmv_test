@@ -5,16 +5,17 @@
 
 
 get_ipython().run_line_magic('matplotlib', 'notebook')
+# Pearson_by_limit: Pearson correlations for range of test durations.
+# Graphs show that % passing scores is higher when test duration is shorter.
+# The pearson correlation is calculated for ranges of test duration decreased
+# from full range to just 5 min.
+
 import mplcursors
 import dmv_test_input
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 import numpy as np
 
-# Pearson_by_limit: Pearson correlations for range of test durations.
-# Graphs show that % passing scores is higher when test duration is shorter.
-# The pearson correlation is calculated for ranges of test duration decreased
-# from full range to just 5 min.
 class Pearson_by_limit():
     def duration(self, lo=5., hi=100., inc=5.):
         self.limits = np.arange(lo, hi+0.01*(hi-lo)/inc, inc)
@@ -43,15 +44,22 @@ def plot_pearson(df):
     ax.set_title("Pearson Coefficient vs Upper Limit of Duration (min)")
     ax.set_xlabel("Maximum Duration (min)")
     ax.set_ylabel("Pearson Coefficient")
+    plt.grid(visible=True)
     plt.show()
 
 def main():
     df, risk = dmv_test_input.dmv_risk_input()
-    pearson = Pearson_by_limit(df, hi=30., inc=0.5)
+    pearson = Pearson_by_limit(df, hi=40., inc=0.5)
     correlation = pearson.pearson("duration")
     plot_pearson(pearson)
 
 main()
+
+
+# In[ ]:
+
+
+
 
 
 # In[ ]:
