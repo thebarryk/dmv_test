@@ -207,11 +207,15 @@ def get_arin(ip_string):
 
 class Risk():
     
+    def set_readonly(self, readonly):
+        self.readonly = readonly
+        self.open_option = f'{"r" if self.readonly else "w"}'
+    
     def __init__(self, filename, readonly=True):
 
         # Open database. Create as needed.
         
-        set_readonly(self, readonly)
+        self.set_readonly(readonly)
         self.db_filename = filename
         self.hp = pickle.HIGHEST_PROTOCOL
          
@@ -236,10 +240,6 @@ class Risk():
 
         self.risk_count = len(self.risk)
         self.db.close()
-    
-    def set_readonly(self, readonly):
-        self.readonly = readonly
-        self.open_option = f'{"r" if self.readonly else "w"}'
 
     def find(self, ip_string):
         """ 
