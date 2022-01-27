@@ -38,12 +38,32 @@ def prep_dmv_sample(raw_dataframe, save=False, filename="clean_test_data.csv"):
         df.to_csv("clean_test_data.csv", index=False)
     return df
 
+#-----------------------------------------------------------------------------
+
+def prep_dmv_splunk(raw_dataframe, save=False, filename="clean_test_download.csv"):
     
-def dmv_risk_input():
+    # Rename the columns to match sample before using it.
+    df = raw_dataframe.rename(columns={"IPaddress" : "IPAddress", "ExamineeID" : "ExamineeId"})
+    
+    df = prep_dmv_sample(df, save=False)
+    
+    # Cast the TotalScore from float to int
+    df.TotalScore = df.TotalScore.astype(int)
+
+    # Make a copy of the cleaned data
+    if save:
+        df.to_csv(filename, index=False)
+    return df
+    
+def dmv_risk_input(case=1, save=False):
     # Reads dmv_test test data, preps and adds ip risk.
     # Returns tuple:
     #   df .... dataframe combo of dmv_test data and ip risk
     #   risk .. dict of the risk associated using an ip address
+    
+    sample_filename = "/home/bkrawchuk/notebooks/dmv_test/OPT11022021-11042021.csv"
+    splunk_filename = "/home/bkrawchuk/notebooks/dmv_test/dmv_akts_2021-10-01_to_2022-01-25.csv"
+    
     def fetch_score(ip):
         # Fetch the risk score associated with this ip address
         # Return as float so it can be used numerically
@@ -60,12 +80,17 @@ def dmv_risk_input():
         return "Unknown"
     
     # Input data
-    sample_filename = "/home/bkrawchuk/notebooks/dmv_test/OPT11022021-11042021.csv"
+    if (case==1):
+        # Read the sample data downloaded from the DMV testing web site
+        filename = sample_filename
+        df1 = pd.read_csv(filename)
+        df = prep_dmv_sample(df1, save=save)
+    else:
+        # Read the data downloaded from splunk query
+        filename = splunk_filename
+        df1 = pd.read_csv(filename)
+        df = prep_dmv_splunk(df1, save=save)       
 
-    # Read the sample data downloaded from the DMV testing web site
-    df1 = pd.read_csv(sample_filename)
-    df = prep_dmv_sample(df1, save=True)
-    
     # Add the risk associated while using the client's ip address
     risk = mywhois.Risk("mywhois", readonly=True)
 
