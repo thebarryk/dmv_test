@@ -281,7 +281,7 @@ class Risk():
             debug.prt(f"Risk.Find: No arin results for {ip_string=}\n")
             return None
         
-        # Add new value to the dict self.risk. Otherwise retunr None.
+        # Add new value to the dict self.risk. Otherwise return None.
         self.addarin = self.add(self.getarin)
         if self.addarin is None:
             debug.prt(f"Risk.find: ARIN results could not be added for {ip_string=}\n")
@@ -317,9 +317,9 @@ class Risk():
         Add the result of get_arin, a dict with cidr as key 
         to both the Risk.risk dict and the database.
         Return:
-        False ... No risks to add.
-                 A risk value could not be pickle'd
-        True ... Risks added successfully
+        False ....... No risks to add.
+                      A risk value could not be pickle'd
+        new_risks ... Risks that were added successfully
         '''
                
         # Store in dictionary first.
@@ -354,7 +354,7 @@ class Risk():
                 for addition in additions:
                     self.db[addition[0]] = addition[1]
             
-        return True
+        return new_risks
     
     def cidr_search(self, target_ip):
         # risk.cidr_search(target_ip) is is the net_address that contains the target_ip
