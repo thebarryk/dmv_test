@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[5]:
 
 
 get_ipython().run_line_magic('matplotlib', 'notebook')
@@ -11,7 +11,7 @@ get_ipython().run_line_magic('matplotlib', 'notebook')
 # from full range to just 5 min.
 
 import mplcursors
-import dmv_test_input
+import xdmv_test_input as dti
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 import numpy as np
@@ -19,9 +19,9 @@ import numpy as np
 class Pearson_by_limit():
     def duration(self, lo=5., hi=100., inc=5.):
         self.limits = np.arange(lo, hi+0.01*(hi-lo)/inc, inc)
-    def __init__(self, df, hi=100., inc=5.):
+    def __init__(self, df, field, hi=100., inc=5.):
         self.df = df
-        self.duration(lo=self.df.duration.min(), hi=hi, inc=inc)
+        self.duration(lo=self.df[field].min(), hi=hi, inc=inc)
     def pearson(self, field):
         self.correlation = {}
         for limit in self.limits:
@@ -47,23 +47,17 @@ def plot_pearson(df):
     plt.grid(visible=True)
     plt.show()
 
-def main():
-    df, risk = dmv_test_input.dmv_risk_input()
-    pearson = Pearson_by_limit(df, hi=40., inc=0.5)
-    correlation = pearson.pearson("duration")
+def main(field):
+
+    df = dti.read_dmv_log(case=1)
+    # Add column to evaluate difference between start and end time
+    df["elapsed"]    = abs(df['TestEndDateTime'] - df['TestStartDateTime']).dt.total_seconds()/60.
+    df["difference"] = (df.elapsed - df.duration)
+
+    pearson = Pearson_by_limit(df, field, hi=20., inc=0.25)
+    correlation = pearson.pearson(field)
     plot_pearson(pearson)
+    return df, pearson
 
-main()
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
+df, pearson = main("duration")
 
