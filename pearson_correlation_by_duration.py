@@ -29,16 +29,6 @@ class Pearson_by_limit():
         self.df = df
         self.limits = self.duration(lo=lo, hi=hi, inc=inc)
 
-    def xpearson(self, field):
-        self.correlation = {}
-        for limit in self.limits:
-            self.short = self.df[self.df.duration <= limit]
-            try:
-                self.correlation[limit] = pearsonr(self.short["TotalScore"], self.short[field])[0]
-            except:
-                self.correlation[limit] = 0
-        return self.correlation
-
     def pearson(self, fields):
         self.correlations = {}
         for field in fields:
