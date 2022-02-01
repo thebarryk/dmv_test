@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[10]:
+# In[9]:
 
 
 # Show variation of success vs time spent taking the driver's test.
-# Add compar duration and elapsed time
+# Add compare duration and elapsed time
 # The success rate is averaged over bins of time taken to do the test.
 # The bins are calculated by dividing the longest duration by some integer.
 # See dmv_test/passing_rate.py
@@ -26,29 +26,30 @@ def passing_rate(df, field, limits):
     # DataFrame:
     #    duration ... average of the upper and lower bounds of each interval
     #    rate ....... fraction of tests passed over total tests taken during the duration period
-    pf = []
-    for lim in limits:
-        np = df[(df[field]>=lim[0]) & (df[field]<lim[1]) & (df.Result=="P")][field].count()
-        nf = df[(df[field]>=lim[0]) & (df[field]<lim[1]) & (df.Result!="P")][field].count()
-        duration = 0.5*(lim[0] + lim[1])
-        try:
-            rate = float(np)/( float(np) + float(nf) )
-        except:
-            rate = 0
-        pf.append( (duration, rate) )
-    return pd.DataFrame({
-        field : [x[0] for x in pf],
-        "rate": [x[1] for x in pf]
-    })
+    
+    def rate(lo, hi, df, field):
+        # Calc passing rate inside this interval [lo, hi) of the field
+        df["inside"] = (df[field] >= lo) & (df[field] < hi)
+        n = df.inside.sum()
+        if n == 0:
+            return 0   # Should be np.nan so they can be ignored later
+        np = ( (df.inside) & (df.passed) ).sum()
+        return np/n   
+    
+    pf = pd.DataFrame( { "lo": [x[0] for x in limits], "hi" : [x[1] for x in limits] } )
+    pf["duration"] = 0.5 * (pf.lo + pf.hi)
+    pf["rate"] = pf.apply(lambda x: rate(x.lo, x.hi, df, field), axis=1)
+    pf["field"] = field
+    
+    return pf
 
 def duration_intervals(lo=5., hi=100., inc=5.):
     r = np.arange(lo, hi+0.01*(hi-lo)/inc, inc)
     return [ (r[i], r[i+1]) for i in range(len(r)-1) ] 
 
-def plot_passing_rate(df, field):
+def plot_passing_rate(pf, field):
     fig, ax = plt.subplots(figsize=(10, 5))
-    
-    plt.plot(df[field], df.rate, "o", label=field)
+    plt.plot(pf.duration, pf.rate, "o", label=field)
     
     mplcursors.cursor(hover=True)
     ax.set_title(f"Passing Rate vs {field} (min)")
@@ -59,25 +60,20 @@ def plot_passing_rate(df, field):
     plt.show() 
 
 def main():
-#     df, risk = dmv_test_input.dmv_risk_input()
+
     df = dti.read_dmv_log(case=1)
     df["elapsed"] = abs(df['TestEndDateTime'] - df['TestStartDateTime']).dt.total_seconds()/60.
+    df["passed"]  = (df.Result=="P")
 
     limits = duration_intervals(lo=5, hi=40., inc=1)
-    pf = passing_rate(df, "elapsed", limits)
-
-    plot_passing_rate(pf, "elapsed")
+    pf = passing_rate(df, "duration", limits)
+    
+    plot_passing_rate(pf, "duration")
+    
     return df, pf
 
 if __name__ == '__main__':
     df, pf = main()
-
-
-# In[8]:
-
-
-for k,v in pf.items():
-    print(k,v)
 
 
 # In[ ]:
