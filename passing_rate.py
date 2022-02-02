@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 get_ipython().run_line_magic('matplotlib', 'notebook')
@@ -72,7 +72,7 @@ def plot_passing_rate(pf, fields):
 
 def main():
 
-    df = dti.read_dmv_log(case=1)
+    df = dti.read_dmv_log(case=2)
     df["elapsed"] = abs(df['TestEndDateTime'] - df['TestStartDateTime']).dt.total_seconds()/60.
     df["passed"]  = (df.Result=="P")
 
