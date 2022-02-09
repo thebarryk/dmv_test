@@ -26,24 +26,22 @@ def passing_rate(df, fields, limits):
     #    limits .. list of (upper, lower) bounds of duration intervals as produced 
     #              by function duration_intervals
     # DataFrame:
-    #    duration ... average of the upper and lower bounds of each interval
+    #    duration ... lower bound of each interval
     #    rate ....... fraction of tests passed over total tests taken during the duration period
     
-    def rate(lo, hi, df, fields):
+    def rate(lo, hi, df, field):
         # Calc passing rate inside this interval [lo, hi) of the field
         df["inside"] = (df[field] >= lo) & (df[field] < hi)
         n = df.inside.sum()
         if n == 0:
-            return np.nan   # Should be np.nan so they can be ignored later
+            return np.nan   # np.nan so it can be ignored later
         npassed = ( (df.inside) & (df.passed) ).sum()
         return npassed/n   
     
-#     pf = pd.DataFrame( [x[0] for x in limits], [x[1] for x in limits], columns=["lo", "hi"] )
     pf = pd.DataFrame( { "lo": [x[0] for x in limits], "hi" : [x[1] for x in limits] } )
-    pf["duration"] = 0.5 * (pf.lo + pf.hi)
+    pf["duration"] = pf.lo
     for field in fields:
         pf[field+"_rate"] = pf.apply(lambda x: rate(x.lo, x.hi, df, field), axis=1)
-#     pf["field"] = field
     
     return pf
 
@@ -75,7 +73,7 @@ def main():
     df["elapsed"] = abs(df['TestEndDateTime'] - df['TestStartDateTime']).dt.total_seconds()/60.
     df["passed"]  = (df.Result=="P")
 
-    limits = duration_intervals(lo=5, hi=60., inc=.25)
+    limits = duration_intervals(lo=5, hi=60., inc=1.)
     
     test_times = ["duration", "elapsed"]
     
