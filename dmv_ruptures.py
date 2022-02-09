@@ -25,7 +25,7 @@ import traceback
 from itertools import cycle
 
 # private. part of dmv_test
-import xdmv_test_input as dti    # ToDo: migrate changes to dmv_test_input
+import dmv_test_input as dti    # ToDo: migrate changes to dmv_test_input
 from passing_rate import passing_rate, duration_intervals
 #---------------------------------------------------------------------------
 def find_passing_rate(case=1, field="duration"):
