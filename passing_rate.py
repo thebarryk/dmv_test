@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 get_ipython().run_line_magic('matplotlib', 'notebook')
@@ -48,13 +48,13 @@ def passing_rate(df, fields, limits):
     return pf
 
 def duration_intervals(lo=5., hi=100., inc=5.):
-    r = np.arange(lo, hi+0.01*(hi-lo)/inc, inc)
+    r = np.arange(lo, hi+0.00001*(hi-lo)/inc, inc)
     return [ (r[i], r[i+1]) for i in range(len(r)-1) ] 
 
 def plot_passing_rate(pf, fields):
     linestyle = cycle(["-", "--"])
     color = cycle(["red", "green"])
-    fig, ax = plt.subplots(figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(8, 4))
     for field in fields:
         plt.plot(pf.duration, 
                  pf[field+"_rate"],  "o",
@@ -62,7 +62,6 @@ def plot_passing_rate(pf, fields):
                  linestyle=next(linestyle), 
                  label=field+"_rate")
     
-    mplcursors.cursor(hover=True)
     ax.set_title(f"Passing Rate vs Duration (min)")
     ax.set_xlabel(f"Duration (min)")
     ax.set_ylabel(f"Passing Rate")
@@ -76,9 +75,8 @@ def main():
     df["elapsed"] = abs(df['TestEndDateTime'] - df['TestStartDateTime']).dt.total_seconds()/60.
     df["passed"]  = (df.Result=="P")
 
-    limits = duration_intervals(lo=5, hi=40., inc=.5)
+    limits = duration_intervals(lo=5, hi=60., inc=.25)
     
-#     test_times = ["duration"]
     test_times = ["duration", "elapsed"]
     
     pf = passing_rate(df, test_times, limits)
