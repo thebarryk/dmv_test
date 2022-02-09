@@ -11,7 +11,7 @@ get_ipython().run_line_magic('matplotlib', 'notebook')
 # The bins are calculated by dividing the longest duration by some integer.
 # See dmv_test/passing_rate.py
 
-import xdmv_test_input as dti
+import dmv_test_input as dti
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
