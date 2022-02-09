@@ -1,6 +1,85 @@
-# Gather modules
+# Reads dmv data of different formats and cleanses it
 import pandas as pd
 import mywhois
+
+#-----------------------------------------------------------------------------
+
+def dmv_risk_input(case=1, save=False):
+    # Reads dmv_test test data, preps and adds ip risk.
+    # Returns tuple:
+    #   df .... dataframe combo of dmv_test data and ip risk
+    #   risk .. dict of the risk associated using an ip address
+    
+    sample_filename = "/home/bkrawchuk/notebooks/dmv_test/OPT11022021-11042021.csv"
+    splunk_filename = "/home/bkrawchuk/notebooks/dmv_test/dmv_akts_2021-10-01_to_2022-01-25.csv"
+    
+    def fetch_score(ip):
+        # Fetch the risk score associated with this ip address
+        # Return as float so it can be used numerically
+        r = risk.find(ip)
+        if r:
+            return float(r["score"])
+        return -1
+
+    def fetch_risk(ip):
+        # Fetch the risk discriptor
+        r = risk.find(ip)
+        if r:
+            return r["risk"]
+        return "Unknown"
+    
+    # Input dmv test log for the selected case
+    
+    df = read_dmv_log(case=case, save=save)
+    
+#     if (case==1):
+#         # Read the sample data downloaded from the DMV testing web site
+#         filename = sample_filename
+#         df1 = pd.read_csv(filename, parse_dates=["TestRegistrationDate","TestStartDateTime","TestEndDateTime", "CreateDate", "UpdateDate", "UpdateLogin", "LastAnswerDate", "CancellationDate", "PartnerTransmissionDate", "CreateDate.1", "UpdateDate.1", "LastLoginDate", "LastLockoutDate", "TokenCreateDate", "TokenExpirationDate", "LicExpireDate"])
+#         df = prep_dmv_sample(df1, save=save)
+
+#     else:
+#         # Read the data downloaded from splunk query
+#         filename = splunk_filename
+#         df1 = pd.read_csv(filename, parse_dates=["TestRegistrationDate","TestStartDateTime","TestEndDateTime"])
+#         df = prep_dmv_splunk(df1, save=save)       
+
+    # Add the risk associated while using the client's ip address
+    risk = mywhois.Risk("mywhois", readonly=True)
+
+    vscore = df.loc[:,"ip"].apply(fetch_score).copy()
+    vrisk  = df.loc[:,"ip"].apply(fetch_risk).copy()
+    df.loc[:,"risk"]  = vrisk
+    df.loc[:,"score"] = vscore
+    return df, risk
+
+#-----------------------------------------------------------------------------
+
+def read_dmv_log(case=1, save=False):
+    # Reads dmv_test test data, preps and adds ip risk.
+    sample_filename = "/home/bkrawchuk/notebooks/dmv_test/OPT11022021-11042021.csv"
+    splunk_filename = "/home/bkrawchuk/notebooks/dmv_test/dmv_akts_2021-10-01_to_2022-01-25.csv"
+
+    if (case==1):
+        # Read the sample data downloaded from the DMV testing web site
+        filename = sample_filename
+        df1 = pd.read_csv(filename, \
+                          parse_dates=["TestRegistrationDate","TestStartDateTime","TestEndDateTime", \
+                                       "CreateDate", "UpdateDate", "UpdateLogin", "LastAnswerDate", \
+                                       "CancellationDate", "PartnerTransmissionDate", "CreateDate.1", \
+                                       "UpdateDate.1", "LastLoginDate", "LastLockoutDate", \
+                                       "TokenCreateDate", "TokenExpirationDate", "LicExpireDate"])
+        df = prep_dmv_sample(df1, save=save)
+
+    else:
+        # Read the data downloaded from splunk query
+        filename = splunk_filename
+        df1 = pd.read_csv(filename, parse_dates=["TestRegistrationDate","TestStartDateTime","TestEndDateTime"])
+        df = prep_dmv_splunk(df1, save=save)       
+
+    return df
+
+#-----------------------------------------------------------------------------
 
 def prep_dmv_sample(raw_dataframe, save=False, filename="clean_test_data.csv"):
     # Data prep from sample downloaded from web site database
@@ -54,48 +133,5 @@ def prep_dmv_splunk(raw_dataframe, save=False, filename="clean_test_download.csv
     if save:
         df.to_csv(filename, index=False)
     return df
-    
-def dmv_risk_input(case=1, save=False):
-    # Reads dmv_test test data, preps and adds ip risk.
-    # Returns tuple:
-    #   df .... dataframe combo of dmv_test data and ip risk
-    #   risk .. dict of the risk associated using an ip address
-    
-    sample_filename = "/home/bkrawchuk/notebooks/dmv_test/OPT11022021-11042021.csv"
-    splunk_filename = "/home/bkrawchuk/notebooks/dmv_test/dmv_akts_2021-10-01_to_2022-01-25.csv"
-    
-    def fetch_score(ip):
-        # Fetch the risk score associated with this ip address
-        # Return as float so it can be used numerically
-        r = risk.find(ip)
-        if r:
-            return float(r["score"])
-        return -1
 
-    def fetch_risk(ip):
-        # Fetch the risk discriptor
-        r = risk.find(ip)
-        if r:
-            return r["risk"]
-        return "Unknown"
-    
-    # Input data
-    if (case==1):
-        # Read the sample data downloaded from the DMV testing web site
-        filename = sample_filename
-        df1 = pd.read_csv(filename)
-        df = prep_dmv_sample(df1, save=save)
-    else:
-        # Read the data downloaded from splunk query
-        filename = splunk_filename
-        df1 = pd.read_csv(filename)
-        df = prep_dmv_splunk(df1, save=save)       
-
-    # Add the risk associated while using the client's ip address
-    risk = mywhois.Risk("mywhois", readonly=True)
-
-    vscore = df.loc[:,"ip"].apply(fetch_score).copy()
-    vrisk  = df.loc[:,"ip"].apply(fetch_risk).copy()
-    df.loc[:,"risk"]  = vrisk
-    df.loc[:,"score"] = vscore
-    return df, risk
+#-----------------------------------------------------------------------------
