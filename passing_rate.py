@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 get_ipython().run_line_magic('matplotlib', 'notebook')
@@ -37,11 +37,21 @@ def passing_rate(df, fields, limits):
             return np.nan   # np.nan so it can be ignored later
         npassed = ( (df.inside) & (df.passed) ).sum()
         return npassed/n   
+    def ncount(lo, hi, df, field):
+        # Calc passing rate inside this interval [lo, hi) of the field
+        df["inside"] = (df[field] >= lo) & (df[field] < hi)
+        return df.inside.sum()
+    def pcount(lo, hi, df, field):
+        # Calc passing rate inside this interval [lo, hi) of the field
+        df["inside"] = (df[field] >= lo) & (df[field] < hi) & (df.Result=='P')
+        return df.inside.sum()
     
-    pf = pd.DataFrame( { "lo": [x[0] for x in limits], "hi" : [x[1] for x in limits] } )
-    pf["duration"] = pf.lo
+    pf = pd.DataFrame( { 'lo': [x[0] for x in limits], 'hi' : [x[1] for x in limits] } )
+    pf['duration'] = pf.lo
     for field in fields:
-        pf[field+"_rate"] = pf.apply(lambda x: rate(x.lo, x.hi, df, field), axis=1)
+        pf[field+'_rate'] = pf.apply(lambda x: rate(x.lo, x.hi, df, field), axis=1)
+        pf['ncount'] = pf.apply(lambda x: ncount(x.lo, x.hi, df, field), axis=1)
+        pf['pcount'] = pf.apply(lambda x: pcount(x.lo, x.hi, df, field), axis=1)
     
     return pf
 
@@ -72,13 +82,15 @@ def main():
     df = dti.read_dmv_log(case=2)
     df["elapsed"] = abs(df['TestEndDateTime'] - df['TestStartDateTime']).dt.total_seconds()/60.
     df["passed"]  = (df.Result=="P")
-
-    limits = duration_intervals(lo=5, hi=60., inc=1.)
+    df = df[ (df.duration > 0) & (df.duration <= 40) & (df.elapsed > 0) & (df.elapsed < 60)].reset_index()
+    
+    limits = duration_intervals(lo=5, hi=40., inc=1.)
     
     test_times = ["duration", "elapsed"]
     
     pf = passing_rate(df, test_times, limits)
     
+    #
     plot_passing_rate(pf, test_times)
     
     return df, pf
