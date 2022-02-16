@@ -9,12 +9,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-import dmv_test_input as dti    # ToDo: migrate changes to dmv_test_input
 
-# Used to smooth jagged histgrams
-from scipy.interpolate import interp1d
+# Used to smooth jagged histograms
 from scipy.interpolate import BSpline
 from scipy.ndimage.filters import gaussian_filter
+
+# Local library to read and prep data from dmv akts events in splunk
+import dmv_test_input as dti 
 
 def read_log(case=1, field="duration"):
     # Read and prepare the dmv_akts. Case=1 ... sample ... =2 ... akts database
@@ -37,6 +38,9 @@ df = read_log(case=2)
 
 
 def draw_duration(x, changept, fw=8, fh=4):
+    # Graph histogram to compare use of duration and elapsed time
+    # duration ... time taken to finish test as reported in akts (min)
+    # elapsed .... elapsed clock time from start to finish (min)
     fig, ax = plt.subplots(figsize=(fw, fh))
 
     h1 = ax.hist(x.duration, bins=100, histtype="step", label="Duration")
@@ -45,14 +49,14 @@ def draw_duration(x, changept, fw=8, fh=4):
     duration_median = x.duration.median()
     elapsed_median = x.elapsed.median()
     
-    ax.axvline(x=changept, color="red", linewidth=4, ls=":", label=f"{changept} min")
-    ax.axvline(x=duration_median, color="green", linewidth=4, ls=":", label=f"{duration_median:.1f} min")
-    ax.axvline(x=elapsed_median, color="magenta", linewidth=4, ls=":", label=f"{elapsed_median:.1f} min")
+    l1 = ax.axvline(x=changept, color="red", linewidth=2, ls=":", label=f"{changept} min")
+    l2 = ax.axvline(x=duration_median, color="green", linewidth=2, ls=":", label=f"{duration_median:.1f} min")
+    l3 = ax.axvline(x=elapsed_median, color="magenta", linewidth=2, ls=":", label=f"{elapsed_median:.1f} min")
 
     ax.set_title(f'DMV - Test Time Taken')
     ax.set_xlabel(f'Duration (min)')
     ax.set_ylabel(f'Count')
-    ax.grid(True)
+    ax.grid(False)
     ax.legend()
     plt.show
     return h1, ax
@@ -70,19 +74,33 @@ h1 = draw_duration(df, 12)
 
 
 def draw_passfail_duration(x, changept, rate, fw=8, fh=4):
-    
-    def gfilter(y, sigma=2):
-        # Sooth the jags in histgram with gaussian filter
-        return gaussian_filter(y, sigma=sigma)
+    # Graph compares tests that pass, fail to an estimate of outlier count
+    # outliers are tests with scores higher than the long term average
     
     def smooth(x, y, order=3, num=100):
-        # Smooth with a spline interpolation
-        yfiltered = gfilter(y)
+        # Smooth with a gaussian filter and then spline interpolation
+        yfiltered = gaussian_filter(y, sigma=2)
         smoother = BSpline(x, yfiltered, order)
         u = np.linspace(x.min(), x.max(), num)
 
         return u, smoother(u)
 
+    def draw_outlier_cum(p, changept, rate, median, fw=8, fh=4):
+        # Draw the cumulative outliers
+        # The number of outliers in each bin is count * binsize 
+        binsize = p.duration.diff().mean()
+        p['cum_outlier'] = p.outlier.cumsum()*binsize
+
+        fig, ax = plt.subplots(figsize=(fw, fh))
+        ax.plot(p.duration, p.cum_outlier, label='cum outlier')
+        ax.axvline(x=changept, color="red", linewidth=1, ls=":", label=f"{changept=} min")
+        ax.set_title(f'DMV - Estimate Number of Accumulated Outliers')
+        ax.set_xlabel(f'Duration (min)')
+        ax.set_ylabel(f'Count')
+        ax.legend(loc='lower right')
+        ax.grid(True)
+        plt.show()
+    
     # Find median of all the data
     median = x.duration.median()
 
@@ -102,22 +120,25 @@ def draw_passfail_duration(x, changept, rate, fw=8, fh=4):
     # expected ... # tests expected to pass based on passing rate for duration > changept
     # outlier  ... # tests that occurred greater than the expected rate of passing
     # 
+    # Exclude last duration, the outer edge of last bin. # duration & count must be same.
     p = pd.DataFrame(h2[1][:-1], columns=['duration'])
     p['pass'] = h2[0]
     p['fail'] = h1[0]
     p['expected'] = p['fail']*(rate/(1. - rate))              # passing rate is .67
     p['outlier'] = p['pass'] - p['expected']
+    # The number of outliers cannot be less than 0
+    p['outlier'] = p['outlier'].apply(lambda x: x if x>0 else 0)
 
-    # Sooth the jaggy histograms into a smooth curves
+    # Smooth the jaggy histograms into a smooth curves
     u, v = smooth(p.duration, p.expected, order=2, num=100)
     h3 = ax.plot(u, v, label='expected')
 #     h3 = ax.step(p.duration, p.expected, label='expected')
 
     u, v = smooth(p.duration, p.outlier, order=2, num=100)
     h4 = ax.plot(u, v, label='outlier')
-#     h4 = ax.step(p.duration, p['outlier'], label='outlier')
+    h5 = ax.step(p.duration, p['outlier'], label='outlier')
 
-    # Display the changept and media
+    # Display the changept and median
     ax.axvline(x=changept, color="red", linewidth=1, ls=":", label=f"{changept=} min")
     ax.axvline(x=median, color="green", linewidth=1, ls=":", label=f"{median=:.1f} min")
 
@@ -127,12 +148,20 @@ def draw_passfail_duration(x, changept, rate, fw=8, fh=4):
     ax.grid(False)
     ax.legend()
     plt.show
-    return h1, h2
+    
+    draw_outlier_cum(p, changept, rate, median)
+    return h1, h2, p
 
-h1, h2 = draw_passfail_duration(df, 12.1, .67, fw=8, fh=7)
+h1, h2, p = draw_passfail_duration(df, 12.1, .67, fw=8, fh=7)
 
 
-# In[8]:
+# In[ ]:
+
+
+
+
+
+# In[5]:
 
 
 def duration_kde(df, field, vert, fw=8, fh=4):
@@ -146,8 +175,8 @@ def duration_kde(df, field, vert, fw=8, fh=4):
                      aspect=2)
 
     median = df[field].median()
-    plt.axvline(x=median, color="green", linewidth=4, ls=":", label=f"Median {median:.1f} min")
-    plt.axvline(x=vert, color="red", linewidth=4, ls=":", label=f"Changept {vert:.1f} min")
+    plt.axvline(x=median, color="green", linewidth=2, ls=":", label=f"Median {median:.1f} min")
+    plt.axvline(x=vert, color="red", linewidth=2, ls=":", label=f"Changept {vert:.1f} min")
 
     plt.legend()
     return g1
