@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[ ]:
+
+
 # Reads dmv data of different formats and cleanses it
 import pandas as pd
 import mywhois
@@ -9,10 +15,9 @@ def dmv_risk_input(case=1, save=False):
     # Returns tuple:
     #   df .... dataframe combo of dmv_test data and ip risk
     #   risk .. dict of the risk associated using an ip address
-    
+
     sample_filename = "/home/bkrawchuk/notebooks/dmv_test/OPT11022021-11042021.csv"
-    splunk_filename = "/home/bkrawchuk/notebooks/dmv_test/dmv_akts_2021-10-01_to_2022-01-25.csv"
-    
+
     def fetch_score(ip):
         # Fetch the risk score associated with this ip address
         # Return as float so it can be used numerically
@@ -27,22 +32,10 @@ def dmv_risk_input(case=1, save=False):
         if r:
             return r["risk"]
         return "Unknown"
-    
-    # Input dmv test log for the selected case
-    
-    df = read_dmv_log(case=case, save=save)
-    
-#     if (case==1):
-#         # Read the sample data downloaded from the DMV testing web site
-#         filename = sample_filename
-#         df1 = pd.read_csv(filename, parse_dates=["TestRegistrationDate","TestStartDateTime","TestEndDateTime", "CreateDate", "UpdateDate", "UpdateLogin", "LastAnswerDate", "CancellationDate", "PartnerTransmissionDate", "CreateDate.1", "UpdateDate.1", "LastLoginDate", "LastLockoutDate", "TokenCreateDate", "TokenExpirationDate", "LicExpireDate"])
-#         df = prep_dmv_sample(df1, save=save)
 
-#     else:
-#         # Read the data downloaded from splunk query
-#         filename = splunk_filename
-#         df1 = pd.read_csv(filename, parse_dates=["TestRegistrationDate","TestStartDateTime","TestEndDateTime"])
-#         df = prep_dmv_splunk(df1, save=save)       
+    # Input dmv test log for the selected case
+
+    df = read_dmv_log(case=case, save=save)
 
     # Add the risk associated while using the client's ip address
     risk = mywhois.Risk("mywhois", readonly=True)
@@ -58,24 +51,20 @@ def dmv_risk_input(case=1, save=False):
 def read_dmv_log(case=1, save=False):
     # Reads dmv_test test data, preps and adds ip risk.
     sample_filename = "/home/bkrawchuk/notebooks/dmv_test/OPT11022021-11042021.csv"
-    splunk_filename = "/home/bkrawchuk/notebooks/dmv_test/dmv_akts_2021-10-01_to_2022-01-25.csv"
+#     splunk_filename = "/home/bkrawchuk/notebooks/dmv_test/dmv_akts_2021-10-01_to_2022-01-25.csv"
+    splunk_filename = "/home/bkrawchuk/notebooks/dmv_test/dmv_akts_2021-10-01_to_2022-02-17.csv"
 
     if (case==1):
         # Read the sample data downloaded from the DMV testing web site
         filename = sample_filename
-        df1 = pd.read_csv(filename, \
-                          parse_dates=["TestRegistrationDate","TestStartDateTime","TestEndDateTime", \
-                                       "CreateDate", "UpdateDate", "UpdateLogin", "LastAnswerDate", \
-                                       "CancellationDate", "PartnerTransmissionDate", "CreateDate.1", \
-                                       "UpdateDate.1", "LastLoginDate", "LastLockoutDate", \
-                                       "TokenCreateDate", "TokenExpirationDate", "LicExpireDate"])
+        df1 = pd.read_csv(filename,                           parse_dates=["TestRegistrationDate","TestStartDateTime","TestEndDateTime",                                        "CreateDate", "UpdateDate", "UpdateLogin", "LastAnswerDate",                                        "CancellationDate", "PartnerTransmissionDate", "CreateDate.1",                                        "UpdateDate.1", "LastLoginDate", "LastLockoutDate",                                        "TokenCreateDate", "TokenExpirationDate", "LicExpireDate"])
         df = prep_dmv_sample(df1, save=save)
 
     else:
         # Read the data downloaded from splunk query
         filename = splunk_filename
         df1 = pd.read_csv(filename, parse_dates=["TestRegistrationDate","TestStartDateTime","TestEndDateTime"])
-        df = prep_dmv_splunk(df1, save=save)       
+        df = prep_dmv_splunk(df1, save=save)
 
     return df
 
@@ -100,7 +89,7 @@ def prep_dmv_sample(raw_dataframe, save=False, filename="clean_test_data.csv"):
     df["ip"] = df.IPAddress.apply(lambda x: x.split(":")[0])
 
     # Add column, duration, for the TotalTimeSpent in minutes
-    df["duration"] = df.TotalTimeSpent/60    
+    df["duration"] = df.TotalTimeSpent/60
 
     # Add column, duration, for the TotalTimeSpent in minutes
     df["duration"] = df.TotalTimeSpent/60
@@ -111,7 +100,7 @@ def prep_dmv_sample(raw_dataframe, save=False, filename="clean_test_data.csv"):
     # Remove the extra ip address from tests with more than 1 ip address
     df.loc[:,"ip"] = df.ip.apply(lambda x: x.split(",")[0])
     print(f'Extra ip address dropped in {len(df[df["multiple_ip"]])} tests')
-    
+
     # Make a copy of the cleaned data
     if save:
         df.to_csv("clean_test_data.csv", index=False)
@@ -120,12 +109,12 @@ def prep_dmv_sample(raw_dataframe, save=False, filename="clean_test_data.csv"):
 #-----------------------------------------------------------------------------
 
 def prep_dmv_splunk(raw_dataframe, save=False, filename="clean_test_download.csv"):
-    
+
     # Rename the columns to match sample before using it.
     df = raw_dataframe.rename(columns={"IPaddress" : "IPAddress", "ExamineeID" : "ExamineeId"})
-    
+
     df = prep_dmv_sample(df, save=False)
-    
+
     # Cast the TotalScore from float to int
     df.TotalScore = df.TotalScore.astype(int)
 
@@ -135,3 +124,4 @@ def prep_dmv_splunk(raw_dataframe, save=False, filename="clean_test_download.csv
     return df
 
 #-----------------------------------------------------------------------------
+
