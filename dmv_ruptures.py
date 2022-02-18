@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[11]:
 
 
 get_ipython().run_line_magic('matplotlib', 'notebook')
@@ -27,6 +27,7 @@ from itertools import cycle
 # private. part of dmv_test
 import dmv_test_input as dti    # ToDo: migrate changes to dmv_test_input
 from passing_rate import passing_rate, duration_intervals
+
 #---------------------------------------------------------------------------
 def find_passing_rate(case=1, field="duration"):
     # Read and prepare the dmv_akts. Case=1 ... sample ... =2 ... akts database
@@ -34,12 +35,13 @@ def find_passing_rate(case=1, field="duration"):
     # Set shortest and longest duration to consider in minutes
     # To reduce effect of wild variation
     min_test_duration = 5
-    max_test_duration = 35
+    max_test_duration = 40
     
     df = dti.read_dmv_log(case=case)
 
     df["elapsed"] = abs(df['TestEndDateTime'] - df['TestStartDateTime']).dt.total_seconds()/60.
     df["passed"]  = (df.Result=="P")
+    df = df[ (df.duration > 0) & (df.duration <= 40) & (df.elapsed > 0) & (df.elapsed < 60)].reset_index()
 
     # Break up the test duration into bins
     bins = duration_intervals(lo=min_test_duration, hi=max_test_duration, inc=.5)
@@ -113,7 +115,7 @@ def dynamic_changepoint(points):
     plt.show()
 
 #---------------------------------------------------------------------------
-def display(x, y, bkps, median, field="duration", fw=10, fh=5):
+def display(x, y, bkps, median, field="duration", fw=8, fh=4):
     # Colors are for shaded regions
     color = cycle(["#f44174", "#4286f4"])
     alpha = 0.1
@@ -123,23 +125,23 @@ def display(x, y, bkps, median, field="duration", fw=10, fh=5):
     # Calc changepoints in 
     my_bkps = [x[i-1] for i in bkps]
     # Plot x vs y 
-    plt.plot(x, y, "-o",
+    ax.plot(x, y, "-o",
              color="red",
-             label=field+" rate")
+             label="Passing rate")
     # Shade the areas demarcated by changepoints
     for (start, end), col in zip(pairwise(my_bkps), color):
-        plt.axvspan(max(0, start), end, facecolor=col, alpha=alpha)
+        ax.axvspan(max(0, start), end, facecolor=col, alpha=alpha)
 
 #     mplcursors.cursor(hover=True)
 
-    plt.xlabel("Duration (m)")
-    plt.ylabel("Fraction who passed")
+    ax.set_xlabel("Duration (m)")
+    ax.set_ylabel("Fraction who passed")
     # Make room for the title and labels
     plt.subplots_adjust(top=0.90)
     plt.subplots_adjust(bottom=0.15)
     plt.subplots_adjust(left=.1)
     
-    plt.legend(loc=legend_position)
+#     plt.legend(loc=legend_position)
     
     # Use axes limits to determine offset of text from vertical lines
     (xmin, xmax) = ax.get_xlim()
@@ -148,14 +150,13 @@ def display(x, y, bkps, median, field="duration", fw=10, fh=5):
     dt1 = (dt0[0], ymin+(ymax-ymin)*0.5)
     
     # Draw annotated line at median
-    plt.axvline(x=median, linestyle="dotted")
-    plt.text(median+dt0[0], dt0[1], f"{median=:.1f} min", rotation=90)
+    v1 = ax.axvline(x=median, linestyle="dotted", label=f'{median=:.1f} min')
 
     # Draw annotated line at 1st changepoint
     changept = my_bkps[0]
-    plt.axvline(x=changept, linestyle="dotted")
-    plt.text(changept+dt1[0], dt1[1], f"{changept=:.1f} min", rotation=90)
-
+    v2 = ax.axvline(x=changept, linestyle="dotted", label=f'{changept=:.1f} min')
+    plt.legend()
+    
 #---------------------------------------------------------------------------
 
 field = "duration"
