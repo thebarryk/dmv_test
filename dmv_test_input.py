@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 # Reads dmv data of different formats and cleanses it
@@ -51,6 +51,7 @@ def dmv_risk_input(case=1, save=False):
 def read_dmv_log(case=1, save=False):
     # Reads dmv_test test data, preps and adds ip risk.
     sample_filename = "/home/bkrawchuk/notebooks/dmv_test/OPT11022021-11042021.csv"
+    # Periodically update csv on splunk. Use load_new_risk to update the risk database
 #     splunk_filename = "/home/bkrawchuk/notebooks/dmv_test/dmv_akts_2021-10-01_to_2022-01-25.csv"
     splunk_filename = "/home/bkrawchuk/notebooks/dmv_test/dmv_akts_2021-10-01_to_2022-02-17.csv"
 
@@ -124,4 +125,10 @@ def prep_dmv_splunk(raw_dataframe, save=False, filename="clean_test_download.csv
     return df
 
 #-----------------------------------------------------------------------------
+
+
+# In[ ]:
+
+
+
 
