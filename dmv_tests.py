@@ -32,6 +32,8 @@ def read_log(case=1, field="duration"):
     return df
 
 df = read_log(case=2)
+changept = 14.5
+print(f'{changept=}')
 
 
 # In[2]:
@@ -49,9 +51,9 @@ def draw_duration(x, changept, fw=8, fh=4):
     duration_median = x.duration.median()
     elapsed_median = x.elapsed.median()
     
-    l1 = ax.axvline(x=changept, color="red", linewidth=2, ls=":", label=f"{changept} min")
-    l2 = ax.axvline(x=duration_median, color="green", linewidth=2, ls=":", label=f"{duration_median:.1f} min")
-    l3 = ax.axvline(x=elapsed_median, color="magenta", linewidth=2, ls=":", label=f"{elapsed_median:.1f} min")
+    l1 = ax.axvline(x=changept, color="red", linewidth=2, ls=":", label=f"Changept {changept} min")
+    l2 = ax.axvline(x=duration_median, color="green", linewidth=2, ls=":", label=f"Duration median {duration_median:.1f} min")
+    l3 = ax.axvline(x=elapsed_median, color="magenta", linewidth=2, ls=":", label=f"Elapsed median {elapsed_median:.1f} min")
 
     ax.set_title(f'DMV - Test Time Taken')
     ax.set_xlabel(f'Duration (min)')
@@ -65,12 +67,35 @@ def draw_duration(x, changept, fw=8, fh=4):
 # In[3]:
 
 
-col = ["ExamineeId", "TotalScore", "duration", "elapsed", "passed"]
+col = ["ExamineeId", "TestStartDateTime", "TotalScore", "duration", "elapsed", "passed"]
 
-h1 = draw_duration(df, 12)
+h1 = draw_duration(df, changept)
 
 
 # In[4]:
+
+
+def duration_kde(df, field, vert, fw=8, fh=4):
+
+    sns.set_style("whitegrid")
+    g1 = sns.displot(data=df, x=field, hue="passed",
+                     kde=True, 
+                     palette='prism',
+                     height=fh,
+                     fill=False,
+                     aspect=2)
+
+    median = df[field].median()
+    plt.axvline(x=median, color="green", linewidth=2, ls=":", label=f"Median {median:.1f} min")
+    plt.axvline(x=vert, color="red", linewidth=2, ls=":", label=f"Changept {vert:.1f} min")
+
+    plt.legend()
+    return g1
+
+g1 = duration_kde(df, "duration", 14.5)
+
+
+# In[5]:
 
 
 def draw_passfail_duration(x, changept, rate, fw=8, fh=4):
@@ -94,6 +119,9 @@ def draw_passfail_duration(x, changept, rate, fw=8, fh=4):
         fig, ax = plt.subplots(figsize=(fw, fh))
         ax.plot(p.duration, p.cum_outlier, label='cum outlier')
         ax.axvline(x=changept, color="red", linewidth=1, ls=":", label=f"{changept=} min")
+        xy = (14.5, 5420)
+        xytext = (18, 4600)
+        ax.annotate('5420', xy=xy, xytext=xytext, arrowprops=dict(facecolor='black', shrink=0.05))
         ax.set_title(f'DMV - Estimate Number of Accumulated Outliers')
         ax.set_xlabel(f'Duration (min)')
         ax.set_ylabel(f'Count')
@@ -117,22 +145,22 @@ def draw_passfail_duration(x, changept, rate, fw=8, fh=4):
     ax.axhline(y=0, color="gray", linewidth=1)
 
     # Use the counts calculated by plt.hist to find:
-    # expected ... # tests expected to pass based on passing rate for duration > changept
+    # adjusted ... # tests expected to pass based on passing rate for duration > changept
     # outlier  ... # tests that occurred greater than the expected rate of passing
     # 
     # Exclude last duration, the outer edge of last bin. # duration & count must be same.
     p = pd.DataFrame(h2[1][:-1], columns=['duration'])
     p['pass'] = h2[0]
     p['fail'] = h1[0]
-    p['expected'] = p['fail']*(rate/(1. - rate))              # passing rate is .67
-    p['outlier'] = p['pass'] - p['expected']
+    p['adjusted'] = p['fail']*(rate/(1. - rate))              # passing rate is .67
+    p['outlier'] = p['pass'] - p['adjusted']
     # The number of outliers cannot be less than 0
     p['outlier'] = p['outlier'].apply(lambda x: x if x>0 else 0)
 
     # Smooth the jaggy histograms into a smooth curves
-    u, v = smooth(p.duration, p.expected, order=2, num=100)
-    h3 = ax.plot(u, v, label='expected')
-#     h3 = ax.step(p.duration, p.expected, label='expected')
+    u, v = smooth(p.duration, p.adjusted, order=2, num=100)
+    h3 = ax.plot(u, v, label='adjusted')
+#     h3 = ax.step(p.duration, p.adjusted, label='expected')
 
     u, v = smooth(p.duration, p.outlier, order=2, num=100)
     h4 = ax.plot(u, v, label='outlier')
@@ -146,46 +174,47 @@ def draw_passfail_duration(x, changept, rate, fw=8, fh=4):
     ax.set_xlabel(f'Duration (min)')
     ax.set_ylabel(f'Count')
     ax.grid(False)
-    ax.legend()
+    ax.legend(loc='upper right')
     plt.show
     
     draw_outlier_cum(p, changept, rate, median)
-    return h1, h2, p
+    return h1, h2, h3, h4, h5, p
 
-h1, h2, p = draw_passfail_duration(df, 12.1, .67, fw=8, fh=7)
-
-
-# In[ ]:
+h1, h2, h3, h4, h5, p = draw_passfail_duration(df, 14.5, .67, fw=8, fh=7)
 
 
+# In[6]:
 
 
-
-# In[5]:
-
-
-def duration_kde(df, field, vert, fw=8, fh=4):
-
-    sns.set_style("whitegrid")
-    g1 = sns.displot(data=df, x=field, hue="passed",
-                     kde=True, 
-                     palette='prism',
-                     height=fh,
-                     fill=False,
-                     aspect=2)
-
-    median = df[field].median()
-    plt.axvline(x=median, color="green", linewidth=2, ls=":", label=f"Median {median:.1f} min")
-    plt.axvline(x=vert, color="red", linewidth=2, ls=":", label=f"Changept {vert:.1f} min")
-
-    plt.legend()
-    return g1
-
-g1 = duration_kde(df, "duration", 12.1)
+pd.qcut(df.duration,10)
 
 
-# In[ ]:
+# In[7]:
 
 
+df.duration.describe()
 
+
+# In[8]:
+
+
+np.quantile(df.duration, .99)
+
+
+# In[9]:
+
+
+df["TestStartDateTime"].max()
+
+
+# In[10]:
+
+
+p1, p2= p[p.duration>changept][['pass','fail']].sum()
+
+
+# In[11]:
+
+
+p1,p2,p1/(p1+p2)
 
