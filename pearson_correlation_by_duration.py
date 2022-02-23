@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[6]:
+# In[1]:
 
 
 get_ipython().run_line_magic('matplotlib', 'notebook')
@@ -14,7 +14,7 @@ get_ipython().run_line_magic('matplotlib', 'notebook')
 # from full range to just 5 min.
 
 import mplcursors
-import xdmv_test_input as dti
+import dmv_test_input as dti
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 import numpy as np
@@ -73,12 +73,6 @@ def main():
     return df, pearson
 
 df, pearson = main()
-
-
-# In[ ]:
-
-
-b
 
 
 # In[ ]:
