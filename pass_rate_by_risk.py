@@ -15,7 +15,7 @@ import piso                       # Provide methods for intervals
 import dmv_test_input as dti      # Local library to read and prep data 
 
 
-# In[2]:
+# In[ ]:
 
 
 # Intitalize data and parameters
@@ -42,14 +42,14 @@ changept = 14.5                   # The passing rate changes at the changept
 sbin, ebin, inc = (10, 100, 5)
 
 
-# In[3]:
+# In[ ]:
 
 
 # Drop rows in akts where ip has undefined risk<0. They are probably 10. or 192.. nets
 df.drop(df[df.score < 0].index, inplace=True)
 
 
-# In[4]:
+# In[ ]:
 
 
 # Here's what the risk object looks like
@@ -61,14 +61,14 @@ for i, k in enumerate(risk.risk):
     print()
 
 
-# In[5]:
+# In[ ]:
 
 
 col = ['TestStartDateTime', 'TestEndDateTime', 'TotalScore', 'TotalTimeSpent', 
        'Email', 'ip', 'duration', 'risk', 'score', 'passed']
 
 
-# In[6]:
+# In[ ]:
 
 
 # A standard form of the Interval object
@@ -76,7 +76,7 @@ col = ['TestStartDateTime', 'TestEndDateTime', 'TotalScore', 'TotalTimeSpent',
 # bins = dob(0, 100, 10)
 
 
-# In[7]:
+# In[ ]:
 
 
 # Generate bins from 0 to 100 by 10 for find passing rate vs risk
@@ -93,7 +93,7 @@ bins = pd.IntervalIndex.from_breaks([-epsilon] + list(np.arange(inc, ebin+inc, i
 print(f'The risk score is binned using {sbin, ebin, inc=}\n\n{bins=}')
 
 
-# In[8]:
+# In[ ]:
 
 
 # Construct dataframe for the risk score rates. It can be used to perform the lookup.
@@ -101,7 +101,7 @@ rf = pd.DataFrame({'threshold':bins.left, 'bin': list(range(0,20))}, index=bins)
 rf
 
 
-# In[9]:
+# In[ ]:
 
 
 # Check that the lookup is working
@@ -111,7 +111,7 @@ print(f'{piso.lookup(rf, 75).bin!r}')
 print(f'{piso.lookup(rf, 100).bin!r}')
 
 
-# In[10]:
+# In[ ]:
 
 
 # Identify the bin for each event. bin # is calulated from inc. Lower bound is 0.
@@ -124,35 +124,39 @@ df['bin'] = df.score.apply(fbin)
 # df['bin'] = df.score.apply(lambda x: piso.lookup(rf, x).bin[x])
 
 
-# In[11]:
+# In[ ]:
 
 
-# Count # passed and # failed for each (bin, passed.value)
-dr = df.groupby(['bin','passed'])['passed'].count().to_frame(name='count')
+def find_rate(df):
+    # Count # passed and # failed for each (bin, passed.value)
+    dr = df.groupby(['bin','passed'])['passed'].count().to_frame(name='count')
 
-# Reshape the dataframe fromwide to narrow. 
-# The # passed and failed will be in same record so rate can be calculated/
-dr = dr.pivot_table(index=['bin'], columns='passed', values='count')
+    # Reshape the dataframe fromwide to narrow. 
+    # The # passed and failed will be in same record so rate can be calculated/
+    dr = dr.pivot_table(index=['bin'], columns='passed', values='count')
 
-# Change the column names. True and False do not work
-dr.columns=['p', 'f']
+    # Change the column names. True and False do not work
+    dr.columns=['p', 'f']
 
-# Calculate the passing rate in each bin
-dr['t'] = dr.p + dr.f
-frate = lambda x: x.p/x.t if x.t > 0 else np.nan 
-dr['rate'] = dr.apply(frate, axis=1)
+    # Calculate the passing rate in each bin
+    dr['t'] = dr.p + dr.f
+    frate = lambda x: x.p/x.t if x.t > 0 else np.nan 
+    dr['rate'] = dr.apply(frate, axis=1)
 
-# Join the bin intervals by bin
-dr = dr.merge(rf, left_on='bin', right_on='bin', how='inner')
+    # Join the bin intervals by bin
+    dr = dr.merge(rf, left_on='bin', right_on='bin', how='inner')
 
-# Cum
+    # Cum
+    dr['cumpass'] = dr.p.cumsum()
+    dr['cumfail'] = dr.f.cumsum()
+    dr['cumcount'] = dr.t.cumsum()
+    
+    return dr
 
-dr['cumpass'] = dr.p.cumsum()
-dr['cumfail'] = dr.f.cumsum()
-dr['cumcount'] = dr.t.cumsum()
+dr = find_rate(df)
 
 
-# In[12]:
+# In[ ]:
 
 
 def plot_rate_vs_risk_score(dr):
@@ -180,6 +184,44 @@ def plot_cum_vs_risk_score(dr):
     
 plot_rate_vs_risk_score(dr)
 plot_cum_vs_risk_score(dr)
+
+
+# In[ ]:
+
+
+df.shape
+
+
+# In[ ]:
+
+
+# Let's see if the effect of risk is different for tests that occur becharge changept
+changept = 14.5
+# Select data for duration < changept
+df1 = df.drop(df[df.duration > changept].index).reset_index()
+df1.shape
+
+
+# In[ ]:
+
+
+def plot_rates1(df1):
+    dr1 = find_rate(df1)
+    plot_rate_vs_risk_score(dr1)
+    plot_cum_vs_risk_score(dr1)
+plot_rates1(df1)
+
+
+# In[ ]:
+
+
+df2 = df.drop(df[df.duration <= changept].index).reset_index()
+
+
+# In[ ]:
+
+
+plot_rates1(df2)
 
 
 # In[ ]:
