@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import mplcursors      # Allows interactive matplotlib graphs
 
 # Used to smooth jagged histograms
 from scipy.interpolate import BSpline
@@ -34,6 +35,13 @@ def read_log(case=1, field="duration"):
 df = read_log(case=2)
 changept = 14.5
 print(f'{changept=}')
+col = ["ExamineeId", "TestStartDateTime", "TotalScore", "duration", "elapsed", "passed"]
+
+
+# In[ ]:
+
+
+
 
 
 # In[2]:
@@ -63,13 +71,41 @@ def draw_duration(x, changept, fw=8, fh=4):
     plt.show
     return h1, ax
 
+h1 = draw_duration(df, changept)
+
 
 # In[3]:
 
 
-col = ["ExamineeId", "TestStartDateTime", "TotalScore", "duration", "elapsed", "passed"]
+import mplcursors      # Allows interactive matplotlib graphs
+def draw_duration_cum(df, changept, fw=8, fh=4):
+    # Graph cumulative histogram to people passing in less than changept
+    fig, ax = plt.subplots(figsize=(fw, fh))
+    h1 = ax.hist(df[(df.duration<changept) & (df.passed==True)].duration*60/50, bins=100, histtype="step", label="Cumulative Count", cumulative=True)
+    mplcursors.cursor(hover=True)
 
-h1 = draw_duration(df, changept)
+    duration_median = df.duration.median()
+    elapsed_median = df.elapsed.median()
+    
+    l1 = ax.axvline(x=changept*60/50, color="red", linewidth=2, ls=":", label=f"Changept {changept} min")
+    l2 = ax.axvline(x=duration_median, color="green", linewidth=2, ls=":", label=f"Duration median {duration_median:.1f} min")
+    l3 = ax.axvline(x=elapsed_median, color="magenta", linewidth=2, ls=":", label=f"Elapsed median {elapsed_median:.1f} min")
+
+    ax.set_title(f'DMV - Tests Passed')
+    ax.set_xlabel(f'Time Taken per Question (sec)')
+    ax.set_ylabel(f'Count')
+    ax.grid(False)
+    ax.legend()
+    plt.show
+    return h1, ax
+
+hc1 = draw_duration_cum(df, changept)
+
+
+# In[ ]:
+
+
+
 
 
 # In[4]:
