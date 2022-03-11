@@ -33,6 +33,13 @@ def dmv_risk_input(case=1, save=False):
             return r["risk"]
         return "Unknown"
 
+    def fetch_countrycode(ip):
+        # Fetch the risk discriptor
+        r = risk.find(ip)
+        if r:
+            return r["countrycode"]
+        return "Unknown"
+
     # Input dmv test log for the selected case
 
     df = read_dmv_log(case=case, save=save)
@@ -42,8 +49,10 @@ def dmv_risk_input(case=1, save=False):
 
     vscore = df.loc[:,"ip"].apply(fetch_score).copy()
     vrisk  = df.loc[:,"ip"].apply(fetch_risk).copy()
+    vcountrycode = df.loc[:,"ip"].apply(fetch_countrycode).copy()
     df.loc[:,"risk"]  = vrisk
     df.loc[:,"score"] = vscore
+    df.loc[:,"countrycode"] = vcountrycode
     return df, risk
 
 #-----------------------------------------------------------------------------
