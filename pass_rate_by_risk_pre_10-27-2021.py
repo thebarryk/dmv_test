@@ -4,6 +4,7 @@
 # In[1]:
 
 
+get_ipython().run_line_magic('matplotlib', 'notebook')
 # Continue to examine affect of ip address risk on passing rate.
 # First, focus on period before Oct 27 when it was [72-80%]
 # Second, show other periods
@@ -46,9 +47,9 @@ df, risk = read_data()
 df.drop(df[df.score < 0].index, inplace=True)
 
 CHANGEPT = 14.5                   # The passing rate changes at the changept
-RATE = 0.62                       # Passing rate reaches steady value
+RATE = 0.67                       # Passing rate reaches steady value
 SBIN, EBIN, INC = (5, 100, 5)     # Define bins for risk score
-EPSILON = sys.float_info.epsilon
+EPSILON = sys.float_info.epsilon  # Smallest float
 
 
 # In[3]:
@@ -169,31 +170,43 @@ plot_rate_vs_risk_score(dr, lo, hi)
 # In[8]:
 
 
-# Calculate # outliers per week into dataframe, dr
+def find_outliers(df, rate=RATE):
+    # Find number of outliers per week. Return dataframe, dr
 
-df['n'] = True                                                 # use to count # tests
-grouped_by_week = df.resample('W',on='TestStartDateTime')      # Group data by week
+    df['n'] = True                                                 # use to count # tests
+    grouped_by_week = df.resample('W',on='TestStartDateTime')      # Group data by week
 
-# Sum rouped fields over week
-dr = grouped_by_week.sum().reset_index()
+    # Sum grouped fields by week
+    dr = grouped_by_week.sum().reset_index()
 
-# Find the rate each week 
-dr['rate'] = dr['passed'] / dr['n']
-dr['failed'] = dr['n'] - dr['passed']
+    # Find the rate each week 
+    dr['rate'] = dr['passed'] / dr['n']
+    dr['failed'] = dr['n'] - dr['passed']
 
-dr['wkly_adjusted'] = dr.failed*dr.rate/(1-dr.rate)    # This week's num pass excl. outliers
-dr['adjusted'] = dr.failed*RATE/(1-RATE)               # Same but based on longterm rate
-dr['outlier'] = dr['passed'] - dr.adjusted             # Num people who exceed 88% of others
+    dr['wkly_adjusted'] = dr.failed*dr.rate/(1-dr.rate)    # This week's num pass excl. outliers
+    dr['adjusted'] = dr.failed*rate/(1-rate)               # Same but based on longterm rate
+#     dr['outlier'] = dr.passed - dr.adjusted              # Num people who exceed 88% of others
+    frate = lambda x: max(0, x.passed-x.adjusted)
+    dr['outlier'] = dr.passed - dr.adjusted                # Num people who exceed 88% of others
+    dr.outlier = dr.outlier.apply(lambda x: max(0,x))      # Some are < 0 because of fluctuations
+    
+    # Cum
+    dr['cumadjusted'] = dr.adjusted.cumsum()               # Number without outliers
+    dr['cumoutlier'] = dr.outlier.cumsum()                 # Num outliers
+    dr['cumpassed'] = dr.passed.cumsum()                   # Num who passed
+    dr['cumfailed'] = dr.failed.cumsum()                   # Num who failed
+    
+    return dr
 
 
 # In[9]:
 
 
-col = ['TestStartDateTime', 'TotalScore', 'duration', 'score', 'passed', 'n', 'rate', 'failed'
+col = ['TestStartDateTime', 'passed', 'failed', 'n', 'rate'
       , 'wkly_adjusted', 'adjusted', 'outlier']
 
-
-dr[col].head()
+dr = find_outliers(df)
+dr[col]
 
 
 # In[10]:
@@ -205,6 +218,8 @@ def plot_outliers(dr, lo, hi, fw=6, fh=4):
     plt.plot(dr.TestStartDateTime, dr.failed, label='Failed')
     plt.plot(dr.TestStartDateTime, dr.adjusted, label='Adjusted')
     plt.plot(dr.TestStartDateTime, dr.outlier, label='Outliers')
+#     import mplcursors
+#     mplcursors.cursor(hover=True)
     ax.set_title(f'Counts Showing Outliers for [{lo:%m/%d/%y}, {hi:%m/%d/%y}]')
     ax.set_xlabel(f'Test Date by Week')
     ax.set_ylabel(f'Count Per Week')
@@ -219,8 +234,85 @@ hi1 = df.TestStartDateTime.max()
 plot_outliers(dr, lo1, hi1, fw=8, fh=5)
 
 
-# In[ ]:
+# In[11]:
 
 
+# Plot the cumulative tests as score increases
 
+def plot_outliers_cum(dr, hi, lo):
+    fig, ax = plt.subplots(figsize=(8, 4))
+    plt.stackplot(dr.TestStartDateTime
+                  , dr.cumoutlier, dr.cumadjusted
+                  , step='pre', alpha=.4, edgecolor='black'
+                  , labels=['Outliers', 'Adjusted'])
+    plt.plot(dr.TestStartDateTime, dr.cumpassed, label='Passed')
+    ax.set_title(f'Stacked Cumulative Outliers by Week for [{lo:%m/%d/%y}, {hi:%m/%d/%y}]')
+    ax.set_xlabel(f'Test Date by Week')
+    ax.set_ylabel(f'Cumulative Count per Week')
+    ax.grid(visible=True)
+    ax.legend(loc='upper left')
+    plt.show()
+
+plot_outliers_cum(dr, lo1, hi1)  
+
+
+# In[12]:
+
+
+dr[dr.TestStartDateTime>'11/07/2021'].outlier.describe()
+
+
+# In[13]:
+
+
+col=['TestStartDateTime', 'TotalScore', 'duration', 
+     'score', 'passed', 'n', 'rate', 'failed', 'adjusted',
+       'outlier', 'cumadjusted', 'cumoutlier', 'cumpassed', 'cumfailed']
+dr[col]
+
+
+# In[14]:
+
+
+dr[['n', 'outlier', 'passed', 'failed']].sum()
+
+
+# In[15]:
+
+
+def outlier_variation(df, mxscore=20, changept=CHANGEPT):
+    # Variation of Outliers by duration, risk and countrycode
+
+    def count_outliers(df, condition):
+        df2 = df[ df.passed & condition ].reset_index()
+        try:
+            dr2 = find_outliers(df2)
+            return dr2[['passed', 'outlier']].sum()
+        except:
+            return -1, -1
+
+    conditions = [df.duration<=changept, df.duration>changept, 
+                  df.score >= mxscore, df.score < mxscore, 
+                  df.passed == True, df.passed == False, 
+                  df.countrycode == "US", df.countrycode != "US",
+                  ((df.score >= mxscore) | (df.countrycode!="US"))]
+
+    labels = [f'duration<={changept}', f'duration>{changept}', 
+              f'score >= {mxscore}', f'score < {mxscore}', 
+              'passed == True', 'passed == False', 
+              'in "US"', 'not in US', 'Risk or not US']
+
+    for i, a in enumerate(conditions[0:2]):
+        print(f'\n{labels[i]:32}outliers')
+
+        for j, b in enumerate(conditions[2:]):
+            print(f'--> {labels[j+2]:25}   ', end='')
+            condition = a & b
+            passed, outlier = count_outliers(df, condition)
+            print(f'{outlier:8.0f}')
+    return
+
+
+for ms in [15]:
+    outlier_variation(df, mxscore=ms)
 
