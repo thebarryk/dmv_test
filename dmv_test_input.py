@@ -62,7 +62,11 @@ def read_dmv_log(case=1, save=False):
     sample_filename = "/home/bkrawchuk/notebooks/dmv_test/OPT11022021-11042021.csv"
     # Periodically update csv on splunk. Use load_new_risk to update the risk database
 #     splunk_filename = "/home/bkrawchuk/notebooks/dmv_test/dmv_akts_2021-10-01_to_2022-01-25.csv"
-    splunk_filename = "/home/bkrawchuk/notebooks/dmv_test/dmv_akts_2021-10-01_to_2022-02-17.csv"
+#     splunk_filename = "/home/bkrawchuk/notebooks/dmv_test/dmv_akts_2021-10-01_to_2022-02-17.csv"
+    # Updated query ITS:dmv_akts_download. Two more fields added:
+    #  ip1 ... same as ip but parsed by Splunk
+    #  country ... country looked up by iplocation using ip1
+    splunk_filename = "/home/bkrawchuk/notebooks/dmv_test/dmv_akts_2021-10-01_to_2022-03-17.csv"
 
     if (case==1):
         # Read the sample data downloaded from the DMV testing web site
