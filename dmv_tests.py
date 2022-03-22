@@ -38,13 +38,13 @@ print(f'{changept=}')
 col = ["ExamineeId", "TestStartDateTime", "TotalScore", "duration", "elapsed", "passed"]
 
 
-# In[ ]:
-
-
-
-
-
 # In[2]:
+
+
+len(df)
+
+
+# In[3]:
 
 
 def draw_duration(x, changept, fw=8, fh=4):
@@ -74,7 +74,7 @@ def draw_duration(x, changept, fw=8, fh=4):
 h1 = draw_duration(df, changept)
 
 
-# In[3]:
+# In[4]:
 
 
 import mplcursors      # Allows interactive matplotlib graphs
@@ -102,13 +102,13 @@ def draw_duration_cum(df, changept, fw=8, fh=4):
 hc1 = draw_duration_cum(df, changept)
 
 
-# In[ ]:
+# In[5]:
 
 
+len(df)
 
 
-
-# In[4]:
+# In[6]:
 
 
 def duration_kde(df, field, vert, fw=8, fh=4):
@@ -131,7 +131,7 @@ def duration_kde(df, field, vert, fw=8, fh=4):
 g1 = duration_kde(df, "duration", 14.5)
 
 
-# In[5]:
+# In[44]:
 
 
 def draw_passfail_duration(x, changept, rate, fw=8, fh=4):
@@ -148,16 +148,15 @@ def draw_passfail_duration(x, changept, rate, fw=8, fh=4):
 
     def draw_outlier_cum(p, changept, rate, median, fw=8, fh=4):
         # Draw the cumulative outliers
-        # The number of outliers in each bin is count * binsize 
-        binsize = p.duration.diff().mean()
-        p['cum_outlier'] = p.outlier.cumsum()*binsize
+        p['cum_outlier'] = p.outlier.cumsum()
 
         fig, ax = plt.subplots(figsize=(fw, fh))
         ax.plot(p.duration, p.cum_outlier, label='cum outlier')
         ax.axvline(x=changept, color="red", linewidth=1, ls=":", label=f"{changept=} min")
-        xy = (14.5, 5420)
-        xytext = (18, 4600)
-        ax.annotate('5420', xy=xy, xytext=xytext, arrowprops=dict(facecolor='black', shrink=0.05))
+        intercept = 16890
+        xy = (14.5, intercept)
+        xytext = (18, intercept-2400)
+        ax.annotate(str(intercept), xy=xy, xytext=xytext, arrowprops=dict(facecolor='black', shrink=0.05))
         ax.set_title(f'DMV - Estimate Number of Accumulated Outliers')
         ax.set_xlabel(f'Duration (min)')
         ax.set_ylabel(f'Count')
@@ -184,7 +183,13 @@ def draw_passfail_duration(x, changept, rate, fw=8, fh=4):
     # adjusted ... # tests expected to pass based on passing rate for duration > changept
     # outlier  ... # tests that occurred greater than the expected rate of passing
     # 
-    # Exclude last duration, the outer edge of last bin. # duration & count must be same.
+    # Exclude last duration, the outer edge of last bin. 
+    # In following we use the calculated results made by plt.hist
+    #    h1[0] ... counts of the people who failed in a duration bin
+    #    h1[1] ... leading edge of the bin
+    #    h2[0] ... counts of the people who passed in a duration bin
+    #    h2[1] ... leading edge on the bin
+    
     p = pd.DataFrame(h2[1][:-1], columns=['duration'])
     p['pass'] = h2[0]
     p['fail'] = h1[0]
@@ -219,38 +224,222 @@ def draw_passfail_duration(x, changept, rate, fw=8, fh=4):
 h1, h2, h3, h4, h5, p = draw_passfail_duration(df, 14.5, .67, fw=8, fh=7)
 
 
-# In[6]:
+# In[82]:
 
 
-pd.qcut(df.duration,10)
+def draw_geofenced(x, changept, rate, fw=8, fh=4):
+    # Graph compares tests that pass, fail for tests from outside USA.
+    # These tests could have been geofenced startinf 10/27
+    
+    def smooth(x, y, order=3, num=100):
+        # Smooth with a gaussian filter and then spline interpolation
+        yfiltered = gaussian_filter(y, sigma=2)
+        smoother = BSpline(x, yfiltered, order)
+        u = np.linspace(x.min(), x.max(), num)
+
+        return u, smoother(u)
+
+    def draw_passed_cum(df, changept, rate, median, fw=8, fh=4):
+        # Draw the cumulative passed
+        df['cum_pass'] = df['pass'].cumsum()
+
+        fig, ax = plt.subplots(figsize=(fw, fh))
+        ax.plot(df.duration, df.cum_pass, label='cum passed')
+        ax.axvline(x=changept, color="red", linewidth=1, ls=":", label=f"{changept=} min")
+        intercept = 16890
+        xy = (14.5, intercept)
+        xytext = (18, intercept-2400)
+        ax.annotate(str(intercept), xy=xy, xytext=xytext, arrowprops=dict(facecolor='black', shrink=0.05))
+        ax.set_title(f'DMV - Accumulated Passed Tests from Non-USA IPs')
+        ax.set_xlabel(f'Duration (min)')
+        ax.set_ylabel(f'Count')
+        ax.legend(loc='lower right')
+        ax.grid(True)
+        plt.show()
+
+    # Find median of all the data
+    median = x.duration.median()
+    
+    # Exclude tests that take a long time or have questionable time
+    # Also minimizes the effect of long tail for short duration tests
+    # Note: reset_index because some rows are removed in the copy
+    df = x[(x.duration > 0) & (x.duration <= 40) & (x.elapsed > 0) & (x.elapsed < 60)].reset_index()
+   
+    df.country.fillna('unknown', inplace=True)
+    df['native'] = df.country.isin(['United States', 'Puerto Rico'])
+    df = df[~df.native]
+
+    # Focus on particular period
+    cutoff = '11/15/2021'
+#     df['early'] = df[df.TestStartDateTime < cutoff]
+    
+    # Geofence: Exclude ip addresses that are not in USA as determined by Splunk
+    # Replace country==Nan with unknown. They will be treated as non-native
+ 
+    # Draw histograms of the tests that pass and fail
+    fig, ax = plt.subplots(figsize=(fw, fh))
+#     h1 = ax.hist(df[(df.Result!='P')].duration, bins=100, histtype="step", label="Fail")
+    h1 = ax.hist(df[(df.Result=='P') & (df.TestStartDateTime < cutoff)].duration
+                 , bins=25, histtype="step", label=f'Before {cutoff}')
+    h2 = ax.hist(df[(df.Result=='P')].duration
+                 , bins=25, histtype="step", label="All Time")
+    # Draw x=0 axis
+    ax.axhline(y=0, color="gray", linewidth=1)
+
+    # Use the counts calculated by plt.hist to find:
+    # adjusted ... # tests expected to pass based on passing rate for duration > changept
+    # outlier  ... # tests that occurred greater than the expected rate of passing
+    # 
+    # Exclude last duration, the outer edge of last bin. 
+    # In following we use the calculated results made by plt.hist
+    #    h1[0] ... counts of the people who failed in a duration bin
+    #    h1[1] ... leading edge of the bin
+    #    h2[0] ... counts of the people who passed in a duration bin
+    #    h2[1] ... leading edge on the bin
+    
+    dr = pd.DataFrame(h2[1][:-1], columns=['duration'])
+    dr['pass'] = h2[0]
+    dr['fail'] = h1[0]
+
+    # Display the changept and median
+    ax.axvline(x=changept, color="red", linewidth=1, ls=":", label=f"{changept=} min")
+    ax.axvline(x=median, color="green", linewidth=1, ls=":", label=f"{median=:.1f} min")
+
+    ax.set_title(f'Passed v Duration - Not USA - Compare All to <{cutoff}')
+    ax.set_xlabel(f'Duration (min)')
+    ax.set_ylabel(f'Count of Passed Tests')
+    ax.grid(False)
+    ax.legend(loc='upper right')
+    plt.show
+    
+    draw_passed_cum(dr, changept, rate, median)
+    return h1, h2, h3, h4, h5, dr
+
+h1, h2, h3, h4, h5, p = draw_geofenced(df, 14.5, .67, fw=8, fh=7)
 
 
-# In[7]:
+# In[82]:
 
 
-df.duration.describe()
+def draw_riskfenced(x, changept, rate, fw=8, fh=4):
+    # Graph compares tests that pass, fail for tests with high risk
+    # These tests could have been geofenced starting 10/27
+    
+    def draw_passed_cum(df, changept, rate, median, fw=8, fh=4):
+        # Draw the cumulative passed
+        df['cum_pass'] = df['pass'].cumsum()
+
+        fig, ax = plt.subplots(figsize=(fw, fh))
+        ax.plot(df.duration, df.cum_pass, label='cum passed')
+        ax.axvline(x=changept, color="red", linewidth=1, ls=":", label=f"{changept=} min")
+        intercept = 16890
+        xy = (14.5, intercept)
+        xytext = (18, intercept-2400)
+        ax.annotate(str(intercept), xy=xy, xytext=xytext, arrowprops=dict(facecolor='black', shrink=0.05))
+        ax.set_title(f'DMV - Accumulated Passed Tests from Non-USA IPs')
+        ax.set_xlabel(f'Duration (min)')
+        ax.set_ylabel(f'Count')
+        ax.legend(loc='lower right')
+        ax.grid(True)
+        plt.show()
+
+    # Find median of all the data
+    median = x.duration.median()
+    
+    # Exclude tests that take a long time or have questionable time
+    # Also minimizes the effect of long tail for short duration tests
+    # Note: reset_index because some rows are removed in the copy
+    df = x[(x.duration > 0) & (x.duration <= 40) & (x.elapsed > 0) & (x.elapsed < 60)].reset_index()
+   
+    df.country.fillna('unknown', inplace=True)
+    df['risky'] = df[]
+    df = df[~df.native]
+
+    # Focus on particular period
+    cutoff = '11/15/2021'
+    
+    # Risk fence: Exclude ip addresses that have risk>20
+    # Replace country==Nan with unknown. They will be treated as non-native
+ 
+    # Draw histograms of the tests that pass and fail
+    fig, ax = plt.subplots(figsize=(fw, fh))
+#     h1 = ax.hist(df[(df.Result!='P')].duration, bins=100, histtype="step", label="Fail")
+    h1 = ax.hist(df[(df.Result=='P') & (df.TestStartDateTime < cutoff)].duration
+                 , bins=25, histtype="step", label=f'Before {cutoff}')
+    h2 = ax.hist(df[(df.Result=='P')].duration
+                 , bins=25, histtype="step", label="All Time")
+    # Draw x=0 axis
+    ax.axhline(y=0, color="gray", linewidth=1)
+
+    # Use the counts calculated by plt.hist to find:
+    # adjusted ... # tests expected to pass based on passing rate for duration > changept
+    # outlier  ... # tests that occurred greater than the expected rate of passing
+    # 
+    # Exclude last duration, the outer edge of last bin. 
+    # In following we use the calculated results made by plt.hist
+    #    h1[0] ... counts of the people who failed in a duration bin
+    #    h1[1] ... leading edge of the bin
+    #    h2[0] ... counts of the people who passed in a duration bin
+    #    h2[1] ... leading edge on the bin
+    
+    dr = pd.DataFrame(h2[1][:-1], columns=['duration'])
+    dr['pass'] = h2[0]
+    dr['fail'] = h1[0]
+
+    # Display the changept and median
+    ax.axvline(x=changept, color="red", linewidth=1, ls=":", label=f"{changept=} min")
+    ax.axvline(x=median, color="green", linewidth=1, ls=":", label=f"{median=:.1f} min")
+
+    ax.set_title(f'Passed v Duration - Not USA - Compare All to <{cutoff}')
+    ax.set_xlabel(f'Duration (min)')
+    ax.set_ylabel(f'Count of Passed Tests')
+    ax.grid(False)
+    ax.legend(loc='upper right')
+    plt.show
+    
+    draw_passed_cum(dr, changept, rate, median)
+    return h1, h2, h3, h4, h5, dr
+
+h1, h2, h3, h4, h5, p = draw_geofenced(df, 14.5, .67, fw=8, fh=7)
 
 
-# In[8]:
+# In[84]:
 
 
-np.quantile(df.duration, .99)
+cs = ['United States', 'Puerto Rico']
+cutoff = '11/2/2021'
+def stat(df, cutoff):
+    c1 = df[~(df.country.isin(cs)) & (df.TestStartDateTime<cutoff)].TotalScore.value_counts()
+    c2 = df[~(df.country.isin(cs)) & (df.TestStartDateTime<cutoff)].TotalScore.value_counts()
+    c3 = df[~(df.country.isin(cs))].TotalScore.value_counts()
+    return c1, c2, c3
+c1, c2, c3 = stat(df, cutoff)
 
 
-# In[9]:
+# In[85]:
 
 
-df["TestStartDateTime"].max()
+# c3 = pd.DataFrame(c1, columns=[f'Before {cutoff=}']) 
+c3 = pd.DataFrame({f'Before {cutoff=}' : c1}) 
+# c3 = pd.DataFrame(c1)
+c3[f'After'] = c2
+c3
 
 
-# In[10]:
+# In[ ]:
 
 
-p1, p2= p[p.duration>changept][['pass','fail']].sum()
+df.country
 
 
-# In[11]:
+# In[ ]:
 
 
-p1,p2,p1/(p1+p2)
+df.columns
+
+
+# In[ ]:
+
+
+
 
