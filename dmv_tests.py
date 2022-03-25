@@ -4,7 +4,7 @@
 # In[1]:
 
 
-get_ipython().run_line_magic('matplotlib', 'notebook')
+# %matplotlib notebook
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -41,10 +41,10 @@ print(f'{changept=}')
 col = ["ExamineeId", "TestStartDateTime", "TotalScore", "duration", "elapsed", "passed"]
 
 
-# In[2]:
+# In[29]:
 
 
-def find_intercept(x, y, x0):
+def find_intersect(x, y, x0):
     # Intepolate y0=f(x0) when f(x) is a discrete set of points {(x[i], y[i])}
     # Caution x must be between endpoints; x is monotonically increasing
     for i in list(range(len(df.duration)))[1:]:
@@ -52,7 +52,7 @@ def find_intercept(x, y, x0):
             m = (x[i]-x[i-1]) /( y[i]-y[i-1])
             return y[i] + m*(x0 - x[i-1])
 
-def lbl_intercept(ax, x0, y0, tx, ty):
+def lbl_point(ax, x0, y0, tx, ty):
     # annotate a point with an arrow with test offset by (tx,ty)*1/8 inch (9 points)
     inc = 9
     point = (x0, y0)          # point in axis
@@ -256,228 +256,149 @@ def draw_passfail_duration(x, changept, rate, fw=8, fh=4):
 h1, h2, h3, h4, h5, p = draw_passfail_duration(df, 14.5, .67, fw=8, fh=7)
 
 
-# In[10]:
+# In[30]:
 
 
-def draw_geofenced(x, time_cutoff, risk_cutoff, changept, rate, fw=8, fh=7):
-    # Graph compares tests not from USA that pass before /after cutoff
+def graph_comparison(x, fw=8, fh=7):
+    # Graph compares duration distributions for passing tests to before the cutoff
     # These tests were geofenced starting 10/27
     
-    def draw_histo(df):   
-        # Draw histograms of the passed tests
-        
-        fig, ax = plt.subplots(figsize=(fw, fh))
-        # All the passed tests
-        all_time      = ax.hist(df.duration, 
-                        bins=25, histtype="step", 
-                        label="All Passed Tests")
-        # Passed before the cutoff date. Shows how it was before geofencing.
-        before_cutoff = ax.hist(
-                        df[(df.TestStartDateTime <= time_cutoff)].duration,
-                        bins=25, histtype="step", 
-                        label=f'Before Geofencing {time_cutoff}')
-        # Draw x=0 axis
-        ax.axhline(y=0, color="gray", linewidth=1)
-        # Display the changept and median
-        ax.axvline(x=changept, color="red", linewidth=1, ls=":", label=f"{changept=} min")
-        ax.axvline(x=median, color="green", linewidth=1, ls=":", label=f"{median=:.1f} min")
-
-        ax.set_title(f'Passed v Duration - Not USA - Compare to Before GeoFencing')
-        ax.set_xlabel(f'Duration (min)')
-        ax.set_ylabel(f'Count of Passed Tests')
-        ax.grid(False)
-        ax.legend(loc='upper right')
-        plt.show
-        return all_time, before_cutoff
-
-    def histo_data(before_cutoff, all_time):
-        # Use the counts calculated by plt.hist to find:
-        # Passed Before cutoff ... # passed tests before time_cutoff
-        # Passed_all_time  ....... # passed tests that during all tests
-        # 
-        # Exclude last duration, the outer edge of last bin. 
-        # In following we use the calculated results made by plt.hist
-        #    *[0] ... counts of the people who passed
-        #    *[1] ... leading edge of the duration bin
-
-        dr = pd.DataFrame(before_cutoff[1][:-1], columns=['duration'])
-        dr['before_cutoff'] = before_cutoff[0]
-        dr['all_time'] = all_time[0]
-        return dr
-    
-    def draw_cum(df):
-        # Draw the cumulative passed
-        
-        df['cum_all_time'] = df['all_time'].cumsum()
-        df['cum_before_cutoff'] = df['before_cutoff'].cumsum()
-
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.plot(df.duration, df.cum_before_cutoff, label=f'cum before {time_cutoff}')
-        ax.plot(df.duration, df.cum_all_time, label='cum all time')
-        ax.axvline(x=changept, color="red", linewidth=1, ls=":", label=f"{changept=} min")
-        ax.axvline(x=median, color="green", linewidth=1, ls=":", label=f"{median=:.1f} min")
-        
-        intercept_all = find_intercept(df.duration, df.cum_all_time, median)
-        intercept_before = find_intercept(df.duration, df.cum_before_cutoff, median)
-        lbl_intercept(ax, median, intercept_all, -8, 1)
-        lbl_intercept(ax, median, intercept_before, -8, 1)
-        
-        ax.set_title(f'Accumulated Passed Tests - Non-USA IPs')
-        ax.set_xlabel(f'Duration (min)')
-        ax.set_ylabel(f'Count')
-        ax.legend(loc='center right')
-        ax.grid(True)
-        plt.show()
-
-    # Find median of all the data before it is trimmed
-    median = x.duration.median()
-
-    # Create a copy so other programs are not affected
-    
-    # Exclude tests that take a long time or have questionable time
-    # Also minimizes the effect of long tail for short duration tests
-    df = x[(x.duration > 0) & (x.duration <= 40) 
-           & (x.elapsed > 0) & (x.elapsed < 60)].reset_index()
-
-    # Replace country==Nan with unknown. They will be treated as non-native
-    df.country.fillna('unknown', inplace=True)
-
-    # Restrict to tests from ip addresses outside USA
-    df['native'] = df.country.isin(['United States', 'Puerto Rico'])
-    df = df[~df.native]    
-    
-    # Restrict to passed tests
-    df = df[df.Result=="P"]
-    
-    all_time, before_cutoff = draw_histo(df)
-    dr = histo_data(all_time, before_cutoff)
-    draw_cum(dr)
-    return dr
-
-# Focus on particular period
-time_cutoff = '11/15/2021'
-risk_cutoff = 20
-changept = 14.5
-rate = 0.67
-
-dr1 = draw_geofenced(df, time_cutoff, risk_cutoff, changept, rate, fw=8, fh=7)
-
-
-# In[11]:
-
-
-def draw_riskfenced(x, time_cutoff, risk_cutoff, changept, rate, fw=8, fh=7):
-    # Graph compares ip risky tests that pass before /after cutoff
-    # These tests were geofenced starting 10/27
-    
-    def draw_histo(df):   
-        # Risk fence: Exclude ip addresses that have risk>20
-        # 
+    def graph_histo(df):   
+        # Graph histo of all tests and tests before cutoff
  
-        # Draw histograms of the passed tests
         fig, ax = plt.subplots(figsize=(fw, fh))
+ 
         # All the passed tests
         all_time      = ax.hist(df.duration, 
                         bins=25, histtype="step", 
                         label="All Passed Tests")
         # Passed before the cutoff date. Shows how it was before geofencing.
         before_cutoff = ax.hist(
-                        df[(df.TestStartDateTime <= time_cutoff)].duration,
+                        df[(df.TestStartDateTime <= C.time_cutoff)].duration,
                         bins=25, histtype="step", 
-                        label=f'Before Geofencing {time_cutoff}')
+                        label=f'Before Geofencing {C.time_cutoff}')
         # Draw x=0 axis
         ax.axhline(y=0, color="gray", linewidth=1)
         # Display the changept and median
-        ax.axvline(x=changept, color="red", linewidth=1, ls=":", label=f"{changept=} min")
+        ax.axvline(x=C.changept, color="red", linewidth=1, ls=":", label=f"{C.changept=} min")
         ax.axvline(x=median, color="green", linewidth=1, ls=":", label=f"{median=:.1f} min")
 
-        ax.set_title(f'Passed v Duration - IP Risk > {risk_cutoff} - Compare to Before GeoFencing')
+        ax.set_title(C.title_histo)
         ax.set_xlabel(f'Duration (min)')
         ax.set_ylabel(f'Count of Passed Tests')
         ax.grid(False)
         ax.legend(loc='upper right')
         plt.show
+        # Return plt objects so calculated distributions can be used
         return all_time, before_cutoff
 
     def histo_data(before_cutoff, all_time):
         # Use the counts calculated by plt.hist to find:
-        # Passed Before cutoff ... # passed tests before time_cutoff
-        # Passed_all_time  ....... # passed tests that during all tests
+        # before_cutoff ... # passed tests before time_cutoff
+        # all_time  ....... # passed tests that during all time
         # 
         # Exclude last duration, the outer edge of last bin. 
         # In following we use the calculated results made by plt.hist
-        #    *[0] ... counts of the people who passed
-        #    *[1] ... leading edge of the duration bin
+        #    *[0] ... counts
+        #    *[1] ... leading edges of the bins
 
         dr = pd.DataFrame(before_cutoff[1][:-1], columns=['duration'])
         dr['before_cutoff'] = before_cutoff[0]
         dr['all_time'] = all_time[0]
         return dr
     
-    def draw_cum(df):
-        # Draw the cumulative passed
+    def graph_cum(df):
+        # Graph the cumulative distribution
         
         df['cum_all_time'] = df['all_time'].cumsum()
         df['cum_before_cutoff'] = df['before_cutoff'].cumsum()
 
         fig, ax = plt.subplots(figsize=(8, 4))
-        ax.plot(df.duration, df.cum_before_cutoff, label=f'cum before {time_cutoff}')
+        ax.plot(df.duration, df.cum_before_cutoff, label=f'cum before {C.time_cutoff}')
         ax.plot(df.duration, df.cum_all_time, label='cum all time')
-        ax.axvline(x=changept, color="red", linewidth=1, ls=":", label=f"{changept=} min")
+        ax.axvline(x=C.changept, color="red", linewidth=1, ls=":", label=f"{C.changept=} min")
         ax.axvline(x=median, color="green", linewidth=1, ls=":", label=f"{median=:.1f} min")
         
-        intercept_all = find_intercept(df.duration, df.cum_all_time, median)
-        intercept_before = find_intercept(df.duration, df.cum_before_cutoff, median)
-        lbl_intercept(ax, median, intercept_all, -8, 1)
-        lbl_intercept(ax, median, intercept_before, -8, 1)
+        # Label intersection of median with cdf with arrow and value
+        intersect_all = find_intersect(df.duration, df.cum_all_time, median)
+        intersect_before = find_intersect(df.duration, df.cum_before_cutoff, median)
+        lbl_point(ax, median, intersect_all, -8, 1)
+        lbl_point(ax, median, intersect_before, -8, 1)
         
-        ax.set_title(f'Accumulated Passed Tests - IP Risk > {risk_cutoff}')
+        ax.set_title(C.title_cum)
         ax.set_xlabel(f'Duration (min)')
         ax.set_ylabel(f'Count')
         ax.legend(loc='center right')
         ax.grid(True)
         plt.show()
-
-    # Find median of all the data before it is trimmed
-    median = x.duration.median()
-
-    # Create a copy so other programs are not affected
-    
-    # Exclude tests that take a long time or have questionable time
-    # Also minimizes the effect of long tail for short duration tests
-    df = x[(x.duration > 0) & (x.duration <= 40) 
-           & (x.elapsed > 0) & (x.elapsed < 60)].reset_index()
-
-    # Replace country==Nan with unknown. They will be treated as non-native
-    df.country.fillna('unknown', inplace=True)
-
-    # Restrict to tests from ip addresses that are risky
-    df = df[df.score>risk_cutoff]
-    
-    # Restrict to passed tests
-    df = df[df.Result=="P"]
-    
-    all_time, before_cutoff = draw_histo(df)
+#     import pdb; pdb.set_trace()
+ 
+    all_time, before_cutoff = graph_histo(x)
     dr = histo_data(all_time, before_cutoff)
-    draw_cum(dr)
+    graph_cum(dr)
     return dr
 
-# Focus on particular period
-time_cutoff = '11/15/2021'
-risk_cutoff = 20
-changept = 14.5
-rate = 0.67
+def filter_prep(df):
+    # Exclude tests that take a long time or have questionable time
+    # Also minimizes the effect of long tail for short duration tests
+    result = df[(df.duration > 0) & (df.duration <= 40) 
+           & (df.elapsed > 0) & (df.elapsed < 60)].reset_index()
+    # Replace country==Nan with unknown. They will be treated as non-native
+    result.country.fillna('unknown', inplace=True)
+    # Restrict to passed tests
+    return result[result.Result=="P"]   
 
-dr1 = draw_riskfenced(df, time_cutoff, risk_cutoff, changept, rate, fw=8, fh=7)
+def filter_risky(df):
+    # Filter raw data to include passed tests that used risky ip addresses
+    result = filter_prep(df)
+    
+    # Restrict to tests from ip addresses that are risky
+    result = result[result.score > C.risk_cutoff]
+    return result
+
+def filter_foreign(df):
+    # Filter raw data to include passed tests that used ip from outside USA
+    result = filter_prep(df)
+    
+    # Restrict to tests from ip addresses outside USA
+    result['native'] = result.country.isin(['United States', 'Puerto Rico'])
+    result = result[~result.native]    
+    return result
+
+class Parameters():
+    def __init__(self):
+        self.time_cutoff = '11/15/2021'
+        self.risk_cutoff = 20
+        self.changept = 14.5
+        self.rate = 0.67
+        self.title_histo = f'Passed v Duration - IP Risk > {self.risk_cutoff} - Compare to Before GeoFencing'
+        self.title_cum   = f'Accumulated Passed Tests - IP Risk > {self.risk_cutoff}'
 
 
-# In[12]:
+# In[31]:
+
+
+C = Parameters()
+
+# Find median of all the data before it is filtered
+median = df.duration.median()
+
+# Compare passed tests for risky ip addresses
+dr1 = graph_comparison( filter_risky(df) )
+
+# Compare passed tests for foreign ip addresses
+C.title_histo = f'Passed v Duration - Foreign IPs - Compare to Before GeoFencing'
+C.title_cum   = f'Accumulated Passed Tests - Foreign IPs - Compare to Before GeoFencing'
+dr2 = graph_comparison( filter_foreign(df) )
+
+
+# In[ ]:
 
 
 dr1.to_clipboard()
 
 
-# In[13]:
+# In[ ]:
 
 
 cs = ['United States', 'Puerto Rico']
@@ -490,7 +411,7 @@ def stat(df, cutoff):
 c1, c2, c3 = stat(df, time_cutoff)
 
 
-# In[14]:
+# In[ ]:
 
 
 # c3 = pd.DataFrame(c1, columns=[f'Before {cutoff=}']) 
@@ -500,7 +421,7 @@ c3[f'After'] = c2
 c3
 
 
-# In[15]:
+# In[ ]:
 
 
 def risk_toframe(risk):
@@ -513,6 +434,12 @@ def risk_toframe(risk):
     return pd.DataFrame(tlist)
 
 r = risk_toframe(risk)
+
+
+# In[13]:
+
+
+# How many passed who were 1) both ~US and risky 2) ~US and ~risky 3) ~~US and risky
 
 
 # In[ ]:
