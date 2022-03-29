@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[6]:
 
 
 # Repair the format of the timestamp and over write the risk database
 
 import pandas as pd
-import xmywhois as mywhois
+import mywhois
 import ipaddress
 import pickle
 import dbm
 
 
-# In[2]:
+# In[7]:
 
 
 class Halt():
@@ -48,7 +48,7 @@ def main():
     return risk
 
 
-# In[3]:
+# In[8]:
 
 
 risk = main()
