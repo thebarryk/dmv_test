@@ -10,7 +10,7 @@ import mywhois
 
 #-----------------------------------------------------------------------------
 
-def dmv_risk_input(db_filename='mywhois', case=1, save=False):
+def dmv_risk_input(db_filename='mywhois', case=1, save=False, readonly=True):
     # Reads dmv_test test data, preps and adds ip risk.
     # Returns tuple:
     #   df .... dataframe combo of dmv_test data and ip risk
@@ -45,7 +45,7 @@ def dmv_risk_input(db_filename='mywhois', case=1, save=False):
     df = read_dmv_log(case=case, save=save)
 
     # Add the risk associated while using the client's ip address
-    risk = mywhois.Risk(db_filename, readonly=True)
+    risk = mywhois.Risk(db_filename, readonly=readonly)
 
     vscore = df.loc[:,"ip"].apply(fetch_score).copy()
     vrisk  = df.loc[:,"ip"].apply(fetch_risk).copy()
