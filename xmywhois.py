@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 '''  Module of functions to grow a db of risks for ip addresses
@@ -60,6 +60,7 @@ import os
 from datetime import datetime
 import pprint
 from unidecode import unidecode
+import pdb
 
 
 class Debug():
@@ -216,6 +217,7 @@ def parse_arin(html_text, ip_string):
         return risks
     
     except:
+        import pdb; pdb.set_trace()
         debug.prt(f"Error in parse_arin({ip_string=}\n")
         return None
 
@@ -310,19 +312,7 @@ class Risk():
 
         # Not found when None:
         if self.searchresult:
-            # ip is found within existing_cidr
-            # If readonly, it is not added. Just return what you found.
-            if self.readonly:
-                return self.searchresult
-            # The new cidrs may have to be added
-            self.newarin = get_arin(ip_string)
-            # If we cannot find it, report. The db cannot be updated
-            if self.newarin is None:
-                debug.prt(f"Risk.Find: No arin results for {ip_string=}\n")
-                return None
-            else:
-                merge(self.search_result, self.newarin)
-                return self.newarin
+            return self.searchresult
         
         # Return None when readonly so database is not changed
         if self.readonly:
@@ -342,41 +332,18 @@ class Risk():
         # 
         return self.addarin
     
-    def find_children(self, candidate):
-        # Find the children of a ip_address, candidate.
-        # A child is a subset of a parent.
-        children = []
-        for potential_child in self.risk:
-            # Skip a duplicate
-            if potential_child == candidate:
-                continue
-            if potential_child[0] in candidate:
-                children.append(potential_child)
-        return children
-                
-    def exclude_children(self, candidate):
-        # Expand candidate to a list of candidates that exclude existing subnets
-        children = self.find_children()
-        candidates  = list([candidate])
-        
-        for child in children:
-            # Exclude this child from candidates
-            # The list of candidates grows as they break into subnets
-            # An indexed list is used so additions are not processed with same child
-            for i in range(len(candidates)):
-                excluded = candidates[i].address_exclude(child)
-                if len(excluded) > 0:
-                    # Replace this candidate with excluded list
-                    del candidates[i]
-                    candidates.extend[excluded]
-                    # record them for debugging
-                    self.families[candidates[i]] = excluded
-                    break
-                else:
-                    # No need to change the existing list of candidates
-                    pass
-            
-        return cidrs
+    def qfind(self, ip_string):
+        # quick find - searches without trying to add to db. 
+        # Convenient to use when db is not readonly because new data is not added.
+        try: 
+            self.ip = ipaddress.ip_address(ip_string)
+        except:
+            self.ip = None
+            debug.prt(f"Risk.find: Could not find IPv4Address for {ip_string=}\n")
+            return None
+        # Find the cidr in the database
+        self.searchresult = self.cidr_search(self.ip)
+        return self.searchresult
 
     def add(self, new_risks):
         '''
@@ -391,17 +358,55 @@ class Risk():
                
         # Store in dictionary first.
         # There may be more than one cidr retrieved by get_arin
-        # Each CIDR has to be type ip_network
-
+        # Each type(new_cidr) is string, type(new_risk) is dict
         for new_cidr, new_risk in new_risks.items():          
-            netblock = ipaddress.ip_network(new_cidr)
             
-            # Subdivide parent with any existing cidr's that are subsets of new_cidr
+            # Subdivide new_cidr into subcidr's that exclude children
+            subcidrs = self.exclude_children(ipaddress.ip_network(new_cidr))
             
-            for subcidr in self.exclude_children(netblock):
+            # Add them, all with the same risk
+            for subcidr in subcidrs:
                 self.risk[subcidr] = new_risk
             
         return new_risks
+                
+    def exclude_children(self, parent):
+        def new_parents(cs, ps):
+            if not cs: return ps
+#             if len(ps) ==0:
+#                 import pdb; pdb.set_trace()
+            p = ps.pop()
+            try:
+                x = p.address_exclude(cs[-1])
+                x = list(x)
+                return new_parents(cs[0:-1], ps + x)
+            except:
+                return [p] + new_parents(cs, ps)
+        
+        children = self.find_children(parent)
+        parents  = list([parent])
+#         if len(children) > 0:
+#             import pdb; pdb.set_trace()
+        np = new_parents(children, parents)
+        if len(np) > 1:
+            self.families[parent] = (children,np)
+        return np
+
+    def find_children(self, parent):
+        # Find the children of the ip_network, parent.
+        # A child is a subset of a parent.
+        children = []
+        for potential_child in self.risk:
+            # Skip a duplicate
+            if potential_child == parent:
+                continue
+            # search_cidr always finds existing parent. To find out
+            # whether the ip is part of a child, we would have to 
+            # make an expensive lookup in arin. Almost all savings
+            # from memoization would be spent.
+            if potential_child.subnet_of(parent):
+                children.append(potential_child)
+        return children
     
     def cidr_search(self, target_ip):
         # risk.cidr_search(target_ip) is is the net_address that contains the target_ip
@@ -445,10 +450,4 @@ class Risk():
 
         return True               
         
-
-
-# In[ ]:
-
-
-
 
