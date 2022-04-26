@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[ ]:
+
+
 '''  Module of functions to grow a db of risks for ip addresses
     - Debug: print debug messages (doesn't belong here)
     - get_risk(ip_string): Fetch risk score from scamalytics api
@@ -36,31 +42,9 @@ class Debug():
         self._set = 0
 debug = Debug()       
 
-def get_risk(ip_string):
-    # Return risk factors from scamalytics into a dict
-    #     {"ip": ? , 
-    #      "score": ?, 
-    #      "risk": ?, 
-    #      "risk_comment: ?"}
 
-    # Fetch the complete record from scamalytics restful api
-    # ip_string ... make request by ip address as a string
+# In[2]:
 
-    html_text = ""
-    url = "https://scamalytics.com/ip/" + ip_string
-    html_text = requests.get(url).text
-
-    soup = BeautifulSoup(html_text, 'lxml')
-    
-    # Tag=pre
-    result = json.loads(soup.pre.string)
-
-    # The comment is in the body of an unlabelled div. Used the css class to find.
-    # Cleanup special characters
-    temp = soup.find_all("div", class_="panel_body")[0]
-    result["risk_comment"] = unidecode( temp.get_text() ).replace("  "," ").replace("  "," ")
-    
-    return result
 
 def parse_arin(html_text, ip_string):
     # Return dict of info from arin and scamalytics for each 
@@ -377,7 +361,30 @@ class Risk():
         self.cidr_search_result = None
         return self.cidr_search_result
     
-    
-        
-        
-                
+    def to_riskdb(self):
+        # Output all risk_dict to the database
+        if self.readonly:
+            debug.prt(f'Risk database is readonly. Risk dict will not be outputted.')
+            return
+
+        with dbm.open(self.db_filename, self.open_option) as self.db:
+            for cidr, risk_info in self.risk.items():
+                netblock = ipaddress.ip_network(cidr)
+                try:
+                    pickled_netblock = pickle.dumps(netblock, protocol=self.hp)
+                    pickled_risk     = pickle.dumps(risk_info, protocol=self.hp)
+
+                except BaseException as ex:
+                    debug.prt(f"Pickle error {ex}: {cidr=}\n{risk_info=}\n")
+                    return False
+
+                self.db[pickled_netblock] = pickled_risk
+
+        return True
+
+
+# In[ ]:
+
+
+
+
