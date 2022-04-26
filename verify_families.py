@@ -25,33 +25,32 @@
 #     ff.write(cidrout)
 # ```
 # 
-# The program reads the saves families, with string objects, and verifies that there are no gaps when the subdivided parent is added to the database. That they are all, when combined with their children, contiguous.Two cidrs are contiguous when the last host of the previous cidr is is 3 less than the first host of the next cidr. The difference is 3 because some of the cidr addresses are not used.
+# The program reads the saved families, with string objects, and verifies that there are no gaps when the subdivided parent is added to the database. That they are all, when combined with their children, contiguous.Two cidrs are contiguous when the last host of the previous cidr is is 3 less than the first host of the next cidr. The difference is 3 because some of the cidr addresses are not used.
 
-# In[2]:
+# In[ ]:
 
 
 from ipaddress import *
 import json
 
 def read_families(fn='families.json'):
-    # read the json 
+    # read the json that was stored in a file
     with open(fn, 'r') as hi:
         j_families = hi.read()
     families = json.loads(j_families)
     return families
 
 def edges(lst):
-    # Find list of tuples (first ip, lastip) of a list of cidrs. 
-    # All objects are convert to ip_network
+    # Find list of tuples (firstip, lastip) of a list of cidrs. 
+    # All objects are converted to ip_network objects
     edges = lambda x: (list(ip_network(x).hosts())[0], list(ip_network(x).hosts())[-1])
     r = []
     for l in lst:
         r.append(edges(l))
     return r
 
-def prt_gaps(parent):
+def prt_gaps(s):
     # Output any gap. s is sorted list of children + subdivided parent
-    p = parent
     ns = len(s)
     for i in range(0, ns-1):
         diff = s[i+1][0]==s[i][1]+3
@@ -65,7 +64,7 @@ def merge_members(parent):
     return edges(l1 + l2)
 
 
-# In[4]:
+# In[ ]:
 
 
 
