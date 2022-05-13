@@ -12,36 +12,14 @@
     - class Risk: Find risk from ip_string. Make db to memoize.
       * Makes api's call to find one it and add to db
       
-      **** Undergoing changes
-      In old version, when a new cidr is found any children are deleted and the new one 
-      added. This would be right if the children had the same risk etc, but they don't.
-      A new cidr is never a child of an existing cidr because the search would have 
-      discovered it and the new cidr never proposed.
+      **** Undergoing additional changes 
+      New parent cidr's are added as lists of cidrs that exclude their children.
+      The number of cidr's in the database increased by 2698, from 2291 to 4989.
       
-      In the new version, the children will not be thrown away but instead use 
-      ipaddress method: newcidr.address_exclude(cidr_children) to generate a list 
-      of cidr's that exclude the cidr_children. The list will be added to the database 
-      using the risk info of the new cidr.
-      
-      Thus all the detail will be kept.
-      3/30 Not true. Luck of the draw may add the parent before its children. From then 
-      on the ip of the children will be found in the parent. 
-      We could look up the arin block. If they are children of the parent then they could
-      be merged. This will be costly because we would have to look up the arin block for
-      every address that is found. That's what we are trying to avoid. 
-      
-      So for now we'll be satisfied to only merge the children we find.
-      
-      Method:
-      This copy will be exported to xmywhois.py so that 
-          import xmywhois as mywhois
-      can be used to test the new module. Of course a new database will be employed.
-      
-      **** Alternative
-      This was sketched earlier. 
-      The idea was to make a pointer in the parent cidr to its children and extend the
-      binary search accordingly.
-      This new method does need to extend the binary search.
+      Some of the parents and children may have the same risk score and shouldn't 
+      be added. Leaving them out makes searches more efficient for two reasons. 
+      First there are fewer to search. Second the network intervals will be larger
+      on average and be matched more quickly.
 '''
 
 
@@ -217,7 +195,6 @@ def parse_arin(html_text, ip_string):
         return risks
     
     except:
-        import pdb; pdb.set_trace()
         debug.prt(f"Error in parse_arin({ip_string=}\n")
         return None
 
@@ -362,7 +339,7 @@ class Risk():
         for new_cidr, new_risk in new_risks.items():          
             
             # Subdivide new_cidr into subcidr's that exclude children
-            subcidrs = self.exclude_children(ipaddress.ip_network(new_cidr))
+            subcidrs = self.exclude_children(ipaddress.ip_network(new_cidr), new_risk)
             
             # Add them, all with the same risk
             for subcidr in subcidrs:
@@ -370,35 +347,31 @@ class Risk():
             
         return new_risks
                 
-    def exclude_children(self, parent):
+    def exclude_children(self, parent, parent_risk):
         def new_parents(cs, ps):
             if not cs: return ps
-#             if len(ps) ==0:
-#                 import pdb; pdb.set_trace()
             p = ps.pop()
             try:
                 x = p.address_exclude(cs[-1])
                 x = list(x)
-                return new_parents(cs[0:-1], ps + x)
+                return new_parents(cs[0:-1], ps.extend(x))
             except:
-                return [p] + new_parents(cs, ps)
+                return [p].extend(new_parents(cs, ps))
         
-        children = self.find_children(parent)
-        parents  = list([parent])
-#         if len(children) > 0:
-#             import pdb; pdb.set_trace()
+        children = self.find_children(parent, parent_risk)
+        parents  = list([parent])       
         np = new_parents(children, parents)
         if len(np) > 1:
             self.families[parent] = (children,np)
         return np
 
-    def find_children(self, parent):
+    def find_children(self, parent, parent_risk):
         # Find the children of the ip_network, parent.
         # A child is a subset of a parent.
         children = []
         for potential_child in self.risk:
             # Skip a duplicate
-            if potential_child == parent:
+            if potential_child == parent or parent_risk == self.risk[potential_child]['score']:
                 continue
             # search_cidr always finds existing parent. To find out
             # whether the ip is part of a child, we would have to 
